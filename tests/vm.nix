@@ -350,11 +350,8 @@ pkgs.testers.runNixOSTest {
           user("readlink ~/.config/hypr/theme-active.lua | grep -q tokyo-night")
           errors = user("hyprctl configerrors 2>&1")
           assert errors.strip() in ("", "no errors"), errors
-          # A Qt program, in the dark theme's colours.
-          user("setsid -f uwsm app -- kvantummanager >/dev/null 2>&1 </dev/null")
           machine.sleep(5)
           machine.screenshot("tokyo-night")
-          user("pkill -x kvantummanager || true")
 
       with subtest("the bar loaded every module and image it asked for"):
           journal = user("journalctl --user -b --no-pager -o cat 2>&1")
