@@ -53,6 +53,9 @@ Commands:
   check-packages   List packages this hyprsimple version wants that your NixOS
                    configuration does not provide.
   status           Show which version is installed and which one NixOS provides.
+  gpu [--file]     Show the graphics settings this computer needs, as a
+                   gpu.nix for your NixOS configuration. --file prints only
+                   the file, for: hyprsimple-nixos gpu --file | sudo tee /etc/nixos/gpu.nix
 
 Options for install:
   -y, --yes        Do not ask before moving existing configs aside.
@@ -566,6 +569,266 @@ cmd_install() {
   echo "Log saved to $log"
 }
 
+# ---- gpu -------------------------------------------------------------------
+#
+# hyprsimple's install.sh looks at the graphics hardware and installs drivers
+# for it. On NixOS drivers belong in the configuration, so this looks at the
+# same hardware and writes the configuration instead: a gpu.nix to import.
+
+GPU_PARTS="@gpuParts@"
+GPU_GUIDE="https://github.com/mysh264/hyprsimple-nix/blob/main/docs/gpu.md"
+
+# lspci's address (0000:01:00.0, in hexadecimal) in the form NixOS wants
+# (PCI:1:0:0, in decimal), with the domain after an @ when it is not 0.
+nixos_bus_id() {
+  local domain bus device function
+  IFS=':.' read -r domain bus device function <<<"$1"
+  if ((16#$domain == 0)); then
+    printf 'PCI:%d:%d:%d\n' "$((16#$bus))" "$((16#$device))" "$((16#$function))"
+  else
+    printf 'PCI:%d@%d:%d:%d\n' "$((16#$bus))" "$((16#$domain))" "$((16#$device))" "$((16#$function))"
+  fi
+}
+
+# Which driver an NVIDIA card needs, from the chip name lspci shows (TU117M,
+# GA104, AD107M, GP108M, GK104...) or, failing that, its marketing name.
+#   current  Turing and newer: GTX 1600, RTX 2000 and later, MX 450 and later
+#   older    Maxwell, Pascal, Volta: GTX 900 and 1000, MX 100 to 300
+#   ancient  Kepler and before: too old for Hyprland with NVIDIA's driver
+nvidia_generation() {
+  local name=$1
+  local current_chip='(^|[^A-Z])(TU|GA|AD|GB|GH)[0-9]{3}'
+  local older_chip='(^|[^A-Z])(GP|GM|GV)[0-9]{3}'
+  local ancient_chip='(^|[^A-Z])(GK|GF|GT|NV)[0-9]{2,3}|(^|[^A-Z])G[0-9]{2}[^0-9]'
+  local current_name='GTX 16[0-9]{2}|RTX [2-9][0-9]{3}|RTX PRO|Quadro RTX|RTX A[0-9]{4}|MX ?[4-9][0-9]{2}'
+  local older_name='GTX (9[0-9]{2}|10[0-9]{2})|GT 10[0-9]{2}|Quadro [PM][0-9]{3,4}|MX ?[1-3][0-9]{2}|Titan (X|Xp|V)'
+  if [[ $name =~ $current_chip ]]; then
+    echo current
+  elif [[ $name =~ $older_chip ]]; then
+    echo older
+  elif [[ $name =~ $ancient_chip ]]; then
+    echo ancient
+  elif [[ $name =~ $current_name ]]; then
+    echo current
+  elif [[ $name =~ $older_name ]]; then
+    echo older
+  else
+    echo unknown
+  fi
+}
+
+# A part of gpu.nix, from the files in $GPU_PARTS.
+gpu_part() { cat "$GPU_PARTS/$1.part"; }
+
+cmd_gpu() {
+  local file_only=0
+  case ${1-} in
+    --file) file_only=1 ;;
+    "") ;;
+    -h | --help)
+      echo "Usage: hyprsimple-nixos gpu [--file]"
+      echo "Shows the graphics settings this computer needs. --file prints only gpu.nix."
+      return 0
+      ;;
+    *) die "unknown option for gpu: $1" ;;
+  esac
+
+  # Both can be pointed elsewhere, which is how the tests describe machines.
+  local sysfs=${HYPRSIMPLE_NIX_SYSFS:-/sys} listing
+  if [[ -n ${HYPRSIMPLE_NIX_LSPCI_FILE:-} ]]; then
+    listing=$(cat "$HYPRSIMPLE_NIX_LSPCI_FILE")
+  else
+    listing=$(lspci -D -nn 2>/dev/null) || die "lspci could not list this computer's devices."
+  fi
+
+  local laptop=0
+  compgen -G "$sysfs/class/power_supply/BAT*" >/dev/null && laptop=1
+
+  # One line per graphics device: VGA [0300], 3D [0302] and display [0380]
+  # controllers, which is where lspci puts every kind of GPU.
+  local line slot ids vendor text name
+  local intel_slot="" amd_slot="" nvidia_slot="" nvidia_name="" amd_old=0 vm=0
+  local -a found=()
+  local graphics_class='\[03(00|02|80)\]: '
+  local pci_ids='\[([0-9a-f]{4}):([0-9a-f]{4})\]'
+  local last_bracket='\[([^][]*)\][[:space:]]*$'
+  local old_radeon='Tahiti|Pitcairn|Cape Verde|Oland|Hainan|Curacao|Bonaire|Hawaii|Kaveri|Kabini|Mullins|Neptune|Venus|Mars|Opal|Saturn|Strato'
+  while IFS= read -r line; do
+    [[ $line =~ $graphics_class ]] || continue
+    slot=${line%% *}
+    [[ $line =~ $pci_ids ]] || continue
+    vendor=${BASH_REMATCH[1]}
+    ids=${BASH_REMATCH[0]}
+    text=${line#*]: }
+    text=${text%% "$ids"*}
+    # The marketing name is the last bracketed part, when there is one:
+    # "... Rembrandt [Radeon 680M]" is shown as "Radeon 680M".
+    if [[ $text =~ $last_bracket ]]; then
+      name=${BASH_REMATCH[1]}
+    else
+      name=${text#Intel Corporation }
+      name=${name#NVIDIA Corporation }
+      name=${name#Advanced Micro Devices, Inc. \[AMD/ATI\] }
+    fi
+    case $vendor in
+      8086)
+        [[ -n $intel_slot ]] || intel_slot=$slot
+        found+=("Intel $name|$slot")
+        ;;
+      1002)
+        [[ -n $amd_slot ]] || amd_slot=$slot
+        [[ $text =~ $old_radeon ]] && amd_old=1
+        found+=("AMD $name|$slot")
+        ;;
+      10de)
+        if [[ -z $nvidia_slot ]]; then
+          nvidia_slot=$slot
+          nvidia_name=$text
+        fi
+        found+=("NVIDIA $name|$slot")
+        ;;
+      1af4 | 1234 | 15ad | 80ee | 1b36 | 1414 | 1013)
+        vm=1
+        found+=("$name (a virtual machine's graphics)|$slot")
+        ;;
+      *)
+        found+=("$name|$slot")
+        ;;
+    esac
+  done <<<"$listing"
+
+  local generation=""
+  [[ -n $nvidia_slot ]] && generation=$(nvidia_generation "$nvidia_name")
+
+  # ---- What gpu.nix holds, and what to say about it ----
+  local -a parts=() notes=()
+  local igpu="" igpu_slot=""
+  if [[ -n $intel_slot ]]; then
+    igpu=intel
+    igpu_slot=$intel_slot
+  elif [[ -n $amd_slot ]]; then
+    igpu=amdgpu
+    igpu_slot=$amd_slot
+  fi
+
+  if [[ -n $intel_slot ]]; then
+    parts+=("$(gpu_part intel)")
+    ((laptop)) && parts+=("$(gpu_part intel-laptop)")
+  fi
+  if [[ -n $amd_slot ]]; then
+    parts+=("$(gpu_part amd)")
+    ((amd_old)) && parts+=("$(gpu_part amd-old)")
+  fi
+
+  if [[ -n $nvidia_slot ]]; then
+    local base=nvidia
+    case $generation in
+      older) base=nvidia-older ;;
+      unknown)
+        notes+=("This NVIDIA card is newer than anything this tool knows, so it gets the settings for current cards. If it is a GeForce GTX 900 or 1000, use the 'older card' section of the guide instead.")
+        ;;
+      ancient)
+        base=""
+        notes+=("This NVIDIA card is too old for NVIDIA's driver to run Hyprland. NixOS uses the free 'nouveau' driver for it automatically. It works, but slowly.")
+        ;;
+    esac
+    if [[ -n $base && -n $igpu ]]; then
+      local part
+      part=$(gpu_part "$base-two-gpus")
+      part=${part//@IGPU@/$igpu}
+      part=${part//@IGPU_BUS@/$(nixos_bus_id "$igpu_slot")}
+      part=${part//@NVIDIA_BUS@/$(nixos_bus_id "$nvidia_slot")}
+      if ((!laptop)); then
+        # Switching the card off when idle is a laptop feature.
+        part=$(grep -v 'powerManagement.finegrained' <<<"$part")
+        notes+=("This looks like a desktop with built-in graphics as well as the NVIDIA card. If your screen is plugged into the NVIDIA card, you can switch the built-in graphics off in the BIOS and run 'hyprsimple-nixos gpu' again for a simpler setup.")
+      fi
+      parts+=("$part")
+      notes+=("To run a program on the NVIDIA card, start it with:  nvidia-offload <program>")
+    elif [[ -n $base ]]; then
+      parts+=("$(gpu_part "$base")")
+    fi
+    if [[ -d $sysfs/module/nvidia ]]; then
+      notes+=("The NVIDIA driver is already running. If you set it up yourself already, keep your settings and skip this file.")
+    fi
+  fi
+
+  if [[ -n $intel_slot && -n $amd_slot && -z $nvidia_slot ]]; then
+    notes+=("To run a program on the AMD card, start it with:  DRI_PRIME=1 <program>")
+  fi
+  if ((vm)) && [[ -z $intel_slot && -z $amd_slot && -z $nvidia_slot ]]; then
+    notes+=("This is a virtual machine. Nothing to set here, but Hyprland needs 3D acceleration: turn it on in your virtual machine's display settings (VirtualBox, VMware, or virt-manager with 'OpenGL').")
+  fi
+  ((${#found[@]})) || notes+=("lspci did not find any graphics device.")
+
+  # ---- gpu.nix ----
+  local names="" entry
+  for entry in "${found[@]}"; do names+="${names:+, }${entry%|*}"; done
+  local module
+  module=$(
+    echo "# Graphics settings for this computer, written by 'hyprsimple-nixos gpu'."
+    echo "# Found: ${names:-no graphics device}."
+    echo "# Guide: $GPU_GUIDE"
+    echo "{ config, pkgs, ... }:"
+    echo "{"
+    if ((${#parts[@]} == 0)); then
+      echo "  # Nothing needs setting for this computer."
+    else
+      local first=1
+      for part in "${parts[@]}"; do
+        ((first)) || echo
+        first=0
+        printf '%s\n' "$part"
+      done
+    fi
+    echo "}"
+  )
+
+  if ((file_only)); then
+    printf '%s\n' "$module"
+    return 0
+  fi
+
+  say "${BOLD}Graphics in this computer:${NC}"
+  if ((${#found[@]})); then
+    for entry in "${found[@]}"; do
+      say "  * ${entry%|*}   (at ${entry#*|})"
+    done
+  else
+    say "  (none found)"
+  fi
+  if [[ -n $nvidia_slot ]]; then
+    case $generation in
+      current | unknown) say "  The NVIDIA card is a current one: GTX 1600, RTX 2000 or newer." ;;
+      older) say "  The NVIDIA card is an older one: GTX 900 or GTX 1000 era." ;;
+      ancient) say "  The NVIDIA card is from before the GTX 900 series." ;;
+    esac
+  fi
+  ((laptop)) && say "  This is a laptop."
+  say ""
+  say "${BOLD}This is the gpu.nix file for it:${NC}"
+  say "------------------------------------------------------------------------"
+  printf '%s\n' "$module"
+  say "------------------------------------------------------------------------"
+  if ((${#notes[@]})); then
+    say ""
+    local n
+    for n in "${notes[@]}"; do note "* $n"; done
+  fi
+  say ""
+  if ((${#parts[@]} == 0)); then
+    say "${BOLD}You do not need a gpu.nix.${NC} Go on with: hyprsimple-install"
+    say "More about graphics: $GPU_GUIDE"
+    return 0
+  fi
+  say "${BOLD}To use it:${NC}"
+  say "  1. Save it:   hyprsimple-nixos gpu --file | sudo tee /etc/nixos/gpu.nix"
+  say "  2. Open /etc/nixos/configuration.nix and add ./gpu.nix to its imports list."
+  say "  3. Rebuild:   sudo nixos-rebuild switch"
+  say "  4. Restart the computer."
+  say "Every step explained: $GPU_GUIDE"
+}
+
 # ---- Dispatch --------------------------------------------------------------
 
 command=${1:-}
@@ -575,6 +838,7 @@ case $command in
   sync) cmd_sync "$@" ;;
   check-packages) cmd_check_packages "$@" ;;
   status) cmd_status "$@" ;;
+  gpu) cmd_gpu "$@" ;;
   -h | --help | help | "") usage ;;
   *)
     usage >&2

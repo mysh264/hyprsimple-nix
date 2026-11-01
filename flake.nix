@@ -49,6 +49,20 @@
       templates.default = {
         path = ./templates/default;
         description = "A NixOS configuration with hyprsimple";
+        welcomeText = ''
+          # A NixOS configuration with hyprsimple
+
+          Next steps:
+
+          1. Make the hardware file, on the computer this is for:
+             `nixos-generate-config --show-hardware-config > hardware-configuration.nix`
+          2. Open `configuration.nix` and set your computer's name, time zone and user.
+          3. Rebuild: `sudo nixos-rebuild switch --flake .#my-computer`
+          4. Set up your graphics card: https://github.com/mysh264/hyprsimple-nix/blob/main/docs/gpu.md
+          5. As your user: `hyprsimple-install`
+
+          The full guide: https://github.com/mysh264/hyprsimple-nix/blob/main/docs/install.md
+        '';
       };
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);

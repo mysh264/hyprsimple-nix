@@ -1,0 +1,2 @@
+  # Old AMD cards (Radeon HD 7000 and 8000, R7 and R9 200): use the newer amdgpu driver.
+  hardware.amdgpu.legacySupport.enable = true;

@@ -128,6 +128,13 @@ pkgs.testers.runNixOSTest {
         missing = user("for c in " + " ".join(commands) + "; do command -v $c >/dev/null || echo $c; done").split()
         assert not missing, f"not on PATH: {missing}"
 
+    with subtest("hyprsimple-nixos gpu recognises the virtual machine"):
+        out = user("hyprsimple-nixos gpu 2>&1")
+        print(out)
+        assert "virtual machine" in out, out
+        assert "You do not need a gpu.nix" in out, out
+        user("hyprsimple-nixos gpu --file | grep -q 'Nothing needs setting'")
+
     with subtest("hyprsimple's Lua config parses with this Hyprland"):
         out = user("Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1")
         assert "config ok" in out, out
@@ -236,5 +243,25 @@ pkgs.testers.runNixOSTest {
             "pgrep -u alice -f 'qs -p /home/alice/.local/share/hyprsimple/default/quickshell'",
             timeout=60,
         )
+
+    with subtest("the removal guide's commands work as written"):
+        # Run Part 1 of docs/uninstall.md exactly as a reader would.
+        guide = open("${../docs/uninstall.md}").read()
+        part1 = guide.split("## Part 1")[1].split("## Part 2")[0]
+        blocks = re.findall(r"```sh\n(.*?)```", part1, re.S)
+        assert len(blocks) == 4, f"expected 4 command blocks in Part 1, found {len(blocks)}"
+        for block in blocks:
+            print(user(block + " 2>&1", check=False)[1])
+        # The user's own settings are back where they were.
+        user("grep -qx 'font-size = 13' ~/.config/ghostty/config")
+        user("test -L ~/.config/yazi && test ! -e ~/.config/yazi.backup")
+        # hyprsimple's are put aside, not deleted.
+        user("test ! -e ~/.config/hypr && test -d ~/.config/hypr.hyprsimple-removed")
+        # Its own files, scripts, services and shell line are gone.
+        user("test ! -e ~/.local/share/hyprsimple && test ! -e ~/.local/state/hyprsimple")
+        user("test ! -e ~/.local/bin/theme-switcher.sh && test ! -e ~/.local/bin/hyprsimple-plugin")
+        user("test ! -e ~/.config/systemd/user/battery-monitor.timer")
+        user("! grep -q hyprsimple ~/.bashrc")
+        user("! systemctl --user is-enabled hyprpaper.service")
   '';
 }

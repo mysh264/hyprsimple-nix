@@ -1,0 +1,2 @@
+  # Keeps an Intel laptop cool and quiet. hyprsimple turns this on for Intel laptops too.
+  services.thermald.enable = true;

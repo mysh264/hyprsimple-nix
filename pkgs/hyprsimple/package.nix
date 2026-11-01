@@ -127,6 +127,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       chmod +x $out/bin/hyprsimple-$name
     done
 
+    # The pieces `hyprsimple-nixos gpu` puts together into a gpu.nix.
+    install -Dm644 -t $out/share/hyprsimple-nix/gpu ${./gpu}/*.part
+    substituteInPlace $out/bin/hyprsimple-nixos \
+      --replace-fail '@gpuParts@' "$out/share/hyprsimple-nix/gpu"
+
     install -Dm755 ${./pacman-shim.sh} $out/libexec/hyprsimple-nix/shims/pacman
     substituteInPlace $out/libexec/hyprsimple-nix/shims/pacman \
       --replace-fail '#!/usr/bin/env bash' '#!${lib.getExe bash}'
