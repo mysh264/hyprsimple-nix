@@ -36,17 +36,22 @@ let
   providedArchNames = lib.attrNames mapping ++ lib.optional cfg.muslimtify.enable "muslimtify";
 
   # What hyprsimple's scripts run that Arch has from its base system or as a
-  # dependency of something in packages.txt, so the lists never name it.
+  # dependency of something in packages.txt, so the lists never name it, and
+  # what a desktop environment would bring on a NixOS that has none.
   runtimeDependencies = with pkgs; [
     adwaita-icon-theme # the Adwaita cursor two themes ask for
     curl # hyprsimple-debug's upload
     dbus # dbus-monitor (the bar's idle watch), dbus-update-activation-environment
+    ffmpegthumbnailer # video previews in the file manager
     file
+    gdk-pixbuf # picture previews in the file manager (gdk-pixbuf-thumbnailer)
     glib # gsettings, used by the theme switcher
     gsettings-desktop-schemas
     pciutils # lspci, for the hardware checks
     pulseaudio # pactl; the sound server itself is PipeWire
     wirelesstools # iwconfig and iwlist, for the hotspot script
+    xdg-user-dirs # Documents, Downloads, Music and the other home folders
+    xdg-user-dirs-gtk # those folders in the file manager's sidebar
     xdg-utils
   ];
 in
@@ -167,6 +172,11 @@ in
     programs.gdk-pixbuf.modulePackages = [ pkgs.webp-pixbuf-loader ]; # webp in GTK
     # The file chooser: xdg-desktop-portal-hyprland does not implement one.
     xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    # The accessibility bus. Arch always has it, with GTK; without it GTK apps
+    # complain, and screen readers have nothing to talk to.
+    services.gnome.at-spi2-core.enable = lib.mkDefault true;
+    # A cursor for every program that does not choose one itself.
+    xdg.icons.fallbackCursorThemes = lib.mkDefault [ "Adwaita" ];
 
     # ---- What hyprsimple's installer enables on Arch ------------------------
 
@@ -213,7 +223,30 @@ in
       pkgs.hyprpaper
       pkgs.hyprpolkitagent
       pkgs.hyprsunset
+      pkgs.xdg-user-dirs
     ];
+
+    # The home folders (Documents, Downloads, Music, Pictures, Videos...),
+    # created at every login and named in the user's language. Desktop
+    # environments do this; without one, a home folder only gets the two that
+    # hyprsimple-install makes.
+    systemd.user.services.xdg-user-dirs.wantedBy = [ "graphical-session-pre.target" ];
+    # And the same folders as bookmarks, so the file manager's sidebar and
+    # file pickers list them. xdg-user-dirs-gtk only autostarts this on
+    # GNOME, LXDE and Unity, so it is started here. It needs the display.
+    systemd.user.services.xdg-user-dirs-gtk = {
+      description = "User folders in the file manager's sidebar";
+      wantedBy = [ "graphical-session.target" ];
+      partOf = [ "graphical-session.target" ];
+      after = [
+        "graphical-session.target"
+        "xdg-user-dirs.service"
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.xdg-user-dirs-gtk}/bin/xdg-user-dirs-gtk-update";
+      };
+    };
     # brightnessctl's udev rule, for backlights logind does not handle.
     services.udev.packages = [ pkgs.brightnessctl ];
 

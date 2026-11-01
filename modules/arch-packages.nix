@@ -31,7 +31,9 @@
   ttf-material-symbols-variable.fonts = [ pkgs.material-symbols ];
   qt6-imageformats.packages = [ pkgs.kdePackages.qtimageformats ];
   zenity.packages = [ pkgs.zenity ];
-  webp-pixbuf-loader.nixos = "programs.gdk-pixbuf.modulePackages";
+  # Also in programs.gdk-pixbuf.modulePackages, for GTK. Installed too, because it
+  # carries the thumbnailer that gives webp pictures a preview in the file manager.
+  webp-pixbuf-loader.packages = [ pkgs.webp-pixbuf-loader ];
   nwg-look.packages = [ pkgs.nwg-look ];
   gnome-themes-extra.packages = [ pkgs.gnome-themes-extra ];
 

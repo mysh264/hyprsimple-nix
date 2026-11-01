@@ -10,6 +10,8 @@
   gnugrep,
   gnused,
   util-linux,
+  xdg-user-dirs,
+  xdg-user-dirs-gtk,
 }:
 
 # hyprsimple's own files, prepared for NixOS. This is the tree upstream's
@@ -102,6 +104,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
           gnugrep
           gnused
           util-linux
+          xdg-user-dirs
+          xdg-user-dirs-gtk
         ]
       }'
 

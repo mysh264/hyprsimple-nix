@@ -513,6 +513,13 @@ cmd_install() {
   else
     FAILED+=("theme: run  theme-switcher.sh $HYPRSIMPLE_NIX_DEFAULT_THEME  once you are logged in")
   fi
+  # The home folders (Documents, Downloads, Music...), which a desktop
+  # environment would have made. The login does it again, and adds them to the
+  # file manager's sidebar, which needs the display this may not have.
+  xdg-user-dirs-update >/dev/null 2>&1 || true
+  if [[ -n ${WAYLAND_DISPLAY:-}${DISPLAY:-} ]]; then
+    xdg-user-dirs-gtk-update >/dev/null 2>&1 || true
+  fi
   mkdir -p "$HOME/Videos" "$HOME/Pictures"
 
   # 6. Shell integration (aliases such as hyprsimple-update, starship, zoxide).

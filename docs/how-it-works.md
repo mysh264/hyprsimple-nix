@@ -30,7 +30,11 @@ describes parts 1 and 2 the NixOS way:
 - the services `install.sh` enables: NetworkManager, Bluetooth, PipeWire,
   power-profiles-daemon, and so on;
 - a few things Arch has by default and NixOS does not, like the GNOME
-  settings schemas that hyprsimple's theme switcher writes to.
+  settings schemas that hyprsimple's theme switcher writes to;
+- what a desktop environment would bring on a NixOS that has none: the home
+  folders (with `xdg-user-dirs`, at every login), previews of pictures and
+  videos in the file manager, a fallback mouse cursor, and the accessibility
+  bus.
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 

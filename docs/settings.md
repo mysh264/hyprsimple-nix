@@ -121,7 +121,13 @@ it is good to know:
 - **Fonts** for the bar, the icons and many languages.
 - **Wi-Fi** (NetworkManager), **Bluetooth**, **sound** (PipeWire),
   **battery** information, and **power modes** (power-profiles-daemon).
-- **USB sticks and the trash can** in the file manager.
+- **Your home folders**: Documents, Downloads, Music, Pictures, Videos and the
+  others, made at every login in your language, and listed in the file
+  manager's sidebar.
+- **USB sticks, the trash can, and previews** of pictures and videos in the
+  file manager.
+- **A mouse cursor** for every program, and the **accessibility** service
+  screen readers use.
 - **The firewall port** for LocalSend.
 - **The lock screen's password check.**
 

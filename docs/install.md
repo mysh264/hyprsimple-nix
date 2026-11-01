@@ -289,8 +289,10 @@ What happens:
    settings for (like `~/.config/hypr` or `~/.config/ghostty`), it shows you a
    list. It will **move them aside**, to a name ending in `.backup`. Nothing is
    deleted. Press **Enter** to say yes.
-2. It copies hyprsimple's files into your home folder, turns on its helper
-   services, picks the first theme, and installs the prayer times plugin.
+2. It copies hyprsimple's files into your home folder, makes your home
+   folders (Documents, Downloads, Music, Pictures, Videos...), turns on its
+   helper services, picks the first theme, and installs the prayer times
+   plugin.
 
 ✅ **Did it work?** At the end you see, in green:
 

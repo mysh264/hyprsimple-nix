@@ -14,6 +14,7 @@ do.
 [hyprsimple-install complains](#hyprsimple-install-complains) ·
 [Hyprland does not start](#hyprland-does-not-start) ·
 [No bar at the top](#no-bar-at-the-top) ·
+[The file manager shows only Pictures and Videos](#the-file-manager-shows-only-pictures-and-videos) ·
 [The lock screen does not take my password](#the-lock-screen-does-not-take-my-password) ·
 [No sound, Wi-Fi or Bluetooth](#no-sound-wi-fi-or-bluetooth) ·
 [Prayer times are wrong or missing](#prayer-times-are-wrong-or-missing) ·
@@ -110,6 +111,17 @@ open a terminal (**SUPER + T**) and type:
 ```sh
 ~/.local/bin/hyprsimple-restart-bar.sh
 ```
+
+## The file manager shows only Pictures and Videos
+
+Your other home folders (Documents, Downloads, Music...) are missing. That
+happened with the first version of hyprsimple-nix, on a NixOS without another
+desktop. Update hyprsimple-nix and rebuild (see [Updating](update.md), part
+1), then log out and in again. The folders appear, and the file manager lists
+them in its sidebar.
+
+Your folders are named in your language, and a folder you delete on purpose
+stays deleted. To make them again anyway, type `xdg-user-dirs-update`.
 
 ## The lock screen does not take my password
 

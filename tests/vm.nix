@@ -73,6 +73,11 @@ pkgs.testers.runNixOSTest {
         machine.succeed("test -e /run/current-system/sw/lib/ladspa/librnnoise_ladspa.so")
         machine.succeed("ls /run/current-system/sw/lib/qt-6/plugins/platformthemes/libhyprqt6engine.so")
         machine.succeed("test -x /run/current-system/sw/bin/hyprsimple-install")
+        # What a desktop environment would bring: a fallback cursor, and
+        # thumbnailers for pictures (webp too) and videos.
+        machine.succeed("grep -q Inherits=Adwaita /run/current-system/sw/share/icons/default/index.theme")
+        for thumbnailer in ("gdk-pixbuf-thumbnailer", "webp-pixbuf", "ffmpegthumbnailer"):
+            machine.succeed(f"test -f /run/current-system/sw/share/thumbnailers/{thumbnailer}.thumbnailer")
 
     with subtest("hyprsimple-install sets the user up"):
         user("mkdir -p /tmp/muslimtify-plugin && cp -r /etc/muslimtify-plugin/. /tmp/muslimtify-plugin/"
@@ -89,6 +94,9 @@ pkgs.testers.runNixOSTest {
         assert "hyprsimple is set up for alice" in out, "install reported failures"
         assert "Home Manager" in out, "a config linked into /nix/store was not pointed out"
         user("grep -qx 'font-size = 13' ~/.config/ghostty.backup/config")
+        # The home folders a desktop environment would have made.
+        user("for d in Desktop Documents Downloads Music Pictures Public Templates Videos; do test -d ~/$d || exit 1; done")
+        user("grep -q '^XDG_DOCUMENTS_DIR=' ~/.config/user-dirs.dirs")
         user("test -L ~/.config/yazi.backup && test -d ~/.config/yazi && test ! -L ~/.config/yazi")
 
         user("test -d ~/.local/share/hyprsimple/.git")
@@ -139,7 +147,20 @@ pkgs.testers.runNixOSTest {
         out = user("Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1")
         assert "config ok" in out, out
 
+    with subtest("the file manager can preview pictures and videos"):
+        def exec_of(thumbnailer):
+            return user(f"sed -n 's/^Exec=\\([^ ]*\\).*/\\1/p' /run/current-system/sw/share/thumbnailers/{thumbnailer}.thumbnailer").strip()
+        user(f"{exec_of('webp-pixbuf')} -s 128 \"$(find ~/.config/hypr/themes -name '*.webp' | head -n1)\" /tmp/webp.png && test -s /tmp/webp.png")
+        user(f"{exec_of('gdk-pixbuf-thumbnailer')} -s 128 \"$(find ~/.config/hypr/themes -name '*.jpg' | head -n1)\" /tmp/jpg.png && test -s /tmp/jpg.png")
+        user("ffmpeg -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 /tmp/clip.mp4"
+             " && ffmpegthumbnailer -i /tmp/clip.mp4 -o /tmp/clip.png -s 128 && test -s /tmp/clip.png")
+
     with subtest("a Hyprland session through UWSM"):
+        # Leave the home folder the way hyprsimple-nix's first version did
+        # (Pictures and Videos only), so the login has to make the rest.
+        user("rm -f ~/.config/user-dirs.dirs ~/.config/user-dirs.locale ~/.config/gtk-3.0/bookmarks"
+             " && rmdir ~/Desktop ~/Documents ~/Downloads ~/Music ~/Public ~/Templates"
+             " && (rmdir ~/Projects 2>/dev/null || true)")
         machine.wait_until_succeeds("pgrep -t tty1 -u alice bash", timeout=60)
         machine.send_chars("uwsm start hyprland-uwsm.desktop\n")
         try:
@@ -179,6 +200,11 @@ pkgs.testers.runNixOSTest {
             timeout=60,
         )
         user("systemctl --user is-active graphical-session.target")
+        # The login made the home folders, and put them in the file manager's sidebar.
+        machine.wait_until_succeeds("su - alice -c 'test -d ~/Documents && test -d ~/Downloads && test -d ~/Music'", timeout=60)
+        machine.wait_until_succeeds("su - alice -c 'grep -q /Documents ~/.config/gtk-3.0/bookmarks'", timeout=60)
+        # The accessibility bus answers.
+        user("busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress")
         for unit in ("hyprpolkitagent.service", "hyprsunset.service", "battery-monitor.timer",
                      "hyprsimple-audio-autoswitch.service"):
             machine.wait_until_succeeds(
