@@ -92,8 +92,10 @@ machine? `nix flake init -t github:mysh264/hyprsimple-nix`. No flakes? See
 
 Yes. Every change is tested on NixOS 26.05 and on nixos-unstable, in a
 virtual machine that installs hyprsimple as a normal user, logs in to
-Hyprland, switches themes, updates, and removes it again. See
-[How it works](docs/how-it-works.md#how-it-is-tested).
+Hyprland, uses it (folders, previews, terminal apps, copy and paste, themes),
+updates, and removes it again. And to make sure nothing basic is missing,
+hyprsimple-nix is compared with a real Arch install of hyprsimple, piece by
+piece. See [How it works](docs/how-it-works.md#how-we-know-nothing-is-missing).
 
 ## Thanks
 

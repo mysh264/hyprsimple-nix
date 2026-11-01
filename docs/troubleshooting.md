@@ -16,6 +16,8 @@ do.
 [No bar at the top](#no-bar-at-the-top) ·
 [The file manager shows only Pictures and Videos](#the-file-manager-shows-only-pictures-and-videos) ·
 [The lock screen does not take my password](#the-lock-screen-does-not-take-my-password) ·
+[zoxide warns about its configuration](#zoxide-warns-about-its-configuration) ·
+[A program other computers connect to does not work](#a-program-other-computers-connect-to-does-not-work) ·
 [No sound, Wi-Fi or Bluetooth](#no-sound-wi-fi-or-bluetooth) ·
 [Prayer times are wrong or missing](#prayer-times-are-wrong-or-missing) ·
 [Home Manager complains](#home-manager-complains) ·
@@ -133,6 +135,39 @@ part of `programs.hyprsimple.enable`), then log out and in again.
 in there, and type `sudo nixos-rebuild switch` (with `--flake ...` if you use
 a flake), then `sudo reboot`. Anything you had not saved is lost, but you
 are back in.
+
+## zoxide warns about its configuration
+
+The first `cd` in a new terminal says:
+
+```
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file
+```
+
+This was a small mistake in hyprsimple itself (on Arch too): it set zoxide up
+before starship, and zoxide wants to be last. hyprsimple-nix fixes it. Update
+and rebuild (see [Updating](update.md)), run `hyprsimple-update`, and open a
+new terminal.
+
+## A program other computers connect to does not work
+
+Like hyprsimple's firewall on Arch, NixOS's firewall stops other computers
+from connecting to yours, except for LocalSend. Programs that wait for
+connections need their port opened. For example, for
+[lan-mouse](https://github.com/feschber/lan-mouse) (UDP port 4242), add this
+to `configuration.nix` on **both** computers, and rebuild:
+
+```nix
+  networking.firewall.allowedUDPPorts = [ 4242 ];
+```
+
+Each program's own documentation says which port it uses.
+
+> 💡 lan-mouse may also say that `org.freedesktop.portal.InputCapture` was not
+> found. On NixOS 26.05, Hyprland's portal does not offer that yet (it is new
+> in nixos-unstable), so lan-mouse uses its other way of capturing the mouse
+> instead. It still works.
 
 ## No sound, Wi-Fi or Bluetooth
 

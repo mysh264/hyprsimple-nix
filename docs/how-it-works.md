@@ -55,8 +55,8 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Four small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
-  Each one only does something when `/etc/hyprsimple/source` exists, so
+- Five small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+  The first four only do something when `/etc/hyprsimple/source` exists, so
   hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
      configuration, instead of downloading it with git.
@@ -66,6 +66,8 @@ NixOS:
      migrations written for Arch, which ask pacman "is this installed?", get
      a true answer from your NixOS configuration.
   4. `hyprsimple-debug` reports NixOS facts in its debug report.
+  5. `bashrc.sh` sets zoxide up after starship. This one fixes a bug that
+     also happens on Arch.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -86,6 +88,26 @@ instead of quietly shipping something broken.
 delivers becomes one commit. That is how `hyprsimple-update` can still tell
 you exactly which files a new version changed, just like on Arch, where it
 compares git commits too.
+
+## How we know nothing is missing
+
+hyprsimple's README expects a fresh Arch install where "Hyprland" was picked
+in the installer. Such a system has much more than hyprsimple's package
+lists: Arch's base system, everything those packages pull in, and what the
+installer adds. A NixOS without a desktop environment has none of that.
+
+So we build that exact Arch system in a container, and compare it with what
+hyprsimple-nix gives NixOS, one kind of thing at a time: commands, background
+services, D-Bus services, autostart entries, file previews, portals, plugins,
+fonts and icons. Every real gap found is closed in the module, and the
+virtual machine test checks it. The scripts, and how to run them, are in
+[`maintainers/arch-parity`](../maintainers/arch-parity).
+
+The comparison also found two mistakes in hyprsimple itself, which happen on
+Arch too: zoxide set up in the wrong order (it warned on the first `cd` of
+every terminal), and terminal programs from the app menu (btop, yazi...)
+not opening, because nothing told `uwsm` which terminal to use.
+hyprsimple-nix fixes both.
 
 ## Packages nixpkgs does not have
 
@@ -120,9 +142,13 @@ nix flake check   # the virtual machine test needs KVM
   the tool writes them.
 - **A virtual machine** boots NixOS with the module, and, as a normal user:
   runs `hyprsimple-install`; checks that every command hyprsimple's scripts
-  use is there; starts Hyprland through UWSM; checks the bar, notifications
-  and helper services; switches the theme; runs `hyprsimple-update` with
-  nothing new and then with a changed version; and finally follows the
+  use is there; starts bash, zsh and fish without warnings; checks which
+  programs open PDFs, videos and folders, and that pictures, webp files and
+  videos get previews; starts Hyprland through UWSM; checks the bar,
+  notifications, helper services, home folders, keyring and search; opens a
+  terminal program the way the app menu does; copies and pastes; takes a
+  screenshot; switches the theme; runs `hyprsimple-update` with nothing new
+  and then with a changed version; and finally follows the
   [removal guide](uninstall.md) and checks that the old settings came back.
 
 All of this runs on every change, on both NixOS 26.05 and nixos-unstable.

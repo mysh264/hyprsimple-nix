@@ -1,0 +1,31 @@
+diff --git a/.local/bin/bashrc.sh b/.local/bin/bashrc.sh
+index 52652bc..e7cbb1b 100755
+--- a/.local/bin/bashrc.sh
++++ b/.local/bin/bashrc.sh
+@@ -6,11 +6,6 @@ if [[ -f /usr/share/bash-completion/bash_completion ]]; then
+   . /usr/share/bash-completion/bash_completion
+ fi
+ 
+-# Enable zoxide
+-if command -v zoxide >/dev/null 2>&1; then
+-  eval "$(zoxide init --cmd cd bash)"
+-fi
+-
+ # Enable fzf
+ if command -v fzf >/dev/null 2>&1; then
+   eval "$(fzf --bash)"
+@@ -21,6 +16,14 @@ if command -v starship >/dev/null 2>&1; then
+   eval "$(starship init bash)"
+ fi
+ 
++# Enable zoxide, after starship. starship's init moves whatever is already in
++# PROMPT_COMMAND into its own hook, so a zoxide set up before it loses its
++# entry there, and zoxide 0.10 then warns on every first `cd` of a terminal
++# that it is "not initialized at the end". zoxide asks to be set up last.
++if command -v zoxide >/dev/null 2>&1; then
++  eval "$(zoxide init --cmd cd bash)"
++fi
++
+ # yazi configuration
+ y() {
+   if command -v yazi >/dev/null 2>&1; then

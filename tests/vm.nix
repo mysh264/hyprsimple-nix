@@ -20,6 +20,9 @@ pkgs.testers.runNixOSTest {
       imports = [ self.nixosModules.default ];
 
       programs.hyprsimple.enable = true;
+      # hyprsimple ships setup for these two shells as well; test them too.
+      programs.zsh.enable = true;
+      programs.fish.enable = true;
 
       users.users.alice = {
         isNormalUser = true;
@@ -76,8 +79,13 @@ pkgs.testers.runNixOSTest {
         # What a desktop environment would bring: a fallback cursor, and
         # thumbnailers for pictures (webp too) and videos.
         machine.succeed("grep -q Inherits=Adwaita /run/current-system/sw/share/icons/default/index.theme")
-        for thumbnailer in ("gdk-pixbuf-thumbnailer", "webp-pixbuf", "ffmpegthumbnailer"):
+        for thumbnailer in ("gdk-pixbuf-thumbnailer", "webp-pixbuf", "ffmpegthumbnailer",
+                            "glycin-svg", "glycin-heif", "gsf-office"):
             machine.succeed(f"test -f /run/current-system/sw/share/thumbnailers/{thumbnailer}.thumbnailer")
+        # What a fresh Arch install has and a bare NixOS does not.
+        machine.succeed("test -d /run/current-system/firmware/amdgpu || test -d /run/current-system/firmware/lib/firmware/amdgpu")
+        machine.succeed("fc-list | grep -q 'Adwaita Sans'")
+        machine.succeed("grep -qx com.mitchellh.ghostty.desktop /etc/xdg/xdg-terminals.list")
 
     with subtest("hyprsimple-install sets the user up"):
         user("mkdir -p /tmp/muslimtify-plugin && cp -r /etc/muslimtify-plugin/. /tmp/muslimtify-plugin/"
@@ -132,6 +140,8 @@ pkgs.testers.runNixOSTest {
           playerctl powerprofilesctl pw-cli qs realpath rg script setsid sha256sum slurp
           starship sudo swayimg systemctl timeout upower uwsm vi which wf-recorder wl-copy
           wl-mirror wl-paste wl-screenrec wpctl xdg-open yazi zenity zoxide Hyprland
+          envsubst fuser gpg htop killall mpv openssl pstree python3 secret-tool
+          sensors smartctl update-desktop-database vim wget xdg-terminal-exec xdg-user-dirs-update
         """.split()
         missing = user("for c in " + " ".join(commands) + "; do command -v $c >/dev/null || echo $c; done").split()
         assert not missing, f"not on PATH: {missing}"
@@ -146,6 +156,20 @@ pkgs.testers.runNixOSTest {
     with subtest("hyprsimple's Lua config parses with this Hyprland"):
         out = user("Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1")
         assert "config ok" in out, out
+
+    with subtest("the shells hyprsimple sets up start without warnings"):
+        # zoxide warns on the first cd when it is not set up last (upstream's
+        # bashrc.sh set it up before starship).
+        out = user("TERM=xterm-256color bash -ic 'cd /tmp; cd /' 2>&1")
+        assert "zoxide: detected" not in out, out
+        for shell, rc in (("zsh", "zsh.sh"), ("fish", "fish.fish")):
+            out = user(f"TERM=xterm-256color {shell} -ic 'source ~/.local/bin/{rc}; cd /tmp; cd /' 2>&1")
+            assert "zoxide: detected" not in out, f"{shell}: {out}"
+
+    with subtest("files open with the right programs"):
+        assert user("xdg-mime query default application/pdf").strip() == "firefox.desktop"
+        assert user("xdg-mime query default video/mp4").strip() == "mpv.desktop"
+        assert user("xdg-mime query default inode/directory").strip() == "org.gnome.Nautilus.desktop"
 
     with subtest("the file manager can preview pictures and videos"):
         def exec_of(thumbnailer):
@@ -205,6 +229,10 @@ pkgs.testers.runNixOSTest {
         machine.wait_until_succeeds("su - alice -c 'grep -q /Documents ~/.config/gtk-3.0/bookmarks'", timeout=60)
         # The accessibility bus answers.
         user("busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress")
+        # A password keyring and the file manager's search index are there to start.
+        activatable = user("busctl --user list --activatable")
+        for name in ("org.freedesktop.secrets", "org.freedesktop.LocalSearch3"):
+            assert name in activatable, f"{name} cannot be started"
         for unit in ("hyprpolkitagent.service", "hyprsunset.service", "battery-monitor.timer",
                      "hyprsimple-audio-autoswitch.service"):
             machine.wait_until_succeeds(
@@ -219,6 +247,26 @@ pkgs.testers.runNixOSTest {
         )
         machine.sleep(10)
         machine.screenshot("deep-sea")
+
+    with subtest("everyday things work inside the session"):
+        def in_session(cmd):
+            return user(f"systemd-run --user --wait --collect --pipe --quiet sh -c {shlex.quote(cmd)} 2>&1")
+        # A terminal program from the app menu: the launcher runs `uwsm app -- btop.desktop`.
+        def terminals():
+            return int(user("hyprctl clients -j | jq '[.[] | select(.class == \"com.mitchellh.ghostty\")] | length'").strip() or 0)
+        before = terminals()
+        # Detached, as the launcher does it: uwsm app stays in front while the app runs.
+        user("setsid -f uwsm app -- btop.desktop >/dev/null 2>&1 </dev/null")
+        machine.wait_until_succeeds(
+            "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 clients -j' | jq -e '[.[] | select(.class == \"com.mitchellh.ghostty\")] | length > " + str(before) + "'",
+            timeout=60,
+        )
+        # Copy and paste.
+        assert "hello" in in_session("echo hello | wl-copy && sleep 1 && wl-paste")
+        # A screenshot, with grim, which hyprsimple's Print key uses. (Its own
+        # modes wait for a click to pick a region, window or screen.)
+        in_session("grim /tmp/screen.png")
+        user("test -s /tmp/screen.png")
 
     with subtest("switching theme at runtime"):
         user("~/.local/bin/theme-switcher.sh tokyo-night")

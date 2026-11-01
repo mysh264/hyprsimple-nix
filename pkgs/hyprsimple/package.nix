@@ -30,9 +30,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     hash = "sha256-g8aKuGtN2wqP4GZL4hbgb6sdQVoi2+uy445CW4niLjg=";
   };
 
-  # Each patch only adds a branch taken when /etc/hyprsimple/source exists,
-  # which the NixOS module creates. Everywhere else the scripts behave exactly
-  # as upstream wrote them.
+  # Patches 1 to 4 only add a branch taken when /etc/hyprsimple/source exists,
+  # which the NixOS module creates; everywhere else those scripts behave
+  # exactly as upstream wrote them. Patch 5 fixes a bug that affects every
+  # distribution, until upstream has the fix.
   patches = [
     # hyprsimple-update: take the version from the NixOS configuration instead
     # of git, and leave packages to NixOS instead of pacman.
@@ -44,6 +45,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     ./patches/0003-nixos-migrations-pacman-shim.patch
     # hyprsimple-debug: report NixOS facts instead of pacman's.
     ./patches/0004-nixos-debug-report.patch
+    # bashrc.sh: set zoxide up after starship, so zoxide stops warning on the
+    # first `cd` of every terminal that it is "not initialized at the end".
+    ./patches/0005-bashrc-initialize-zoxide-last.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a

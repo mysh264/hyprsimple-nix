@@ -111,30 +111,46 @@ Graphics settings live in their own file, `gpu.nix`. See the
 
 ## What hyprsimple turns on for you
 
-When you set `programs.hyprsimple.enable = true;`, NixOS gets everything
-hyprsimple's installer sets up on Arch. You do not have to do anything, but
-it is good to know:
+When you set `programs.hyprsimple.enable = true;`, your NixOS gets what
+hyprsimple has on Arch: what its installer sets up, and also what a fresh
+Arch install already had before hyprsimple came. (We check this by building
+exactly that Arch system and comparing; see
+[How it works](how-it-works.md#how-we-know-nothing-is-missing).) You do not
+have to do anything, but it is good to know:
 
 - **Hyprland**, the desktop itself, with its helpers.
 - **The apps and tools** hyprsimple uses: about 80 of them. They are listed in
   [`modules/arch-packages.nix`](../modules/arch-packages.nix).
-- **Fonts** for the bar, the icons and many languages.
-- **Wi-Fi** (NetworkManager), **Bluetooth**, **sound** (PipeWire),
-  **battery** information, and **power modes** (power-profiles-daemon).
+- **Firmware** for graphics cards, Wi-Fi and Bluetooth chips.
+- **Fonts** for the bar, the icons, GTK programs and many languages.
+- **Wi-Fi** (NetworkManager), **Bluetooth**, **sound** (PipeWire, also for
+  JACK programs), **battery** information, and **power modes**.
 - **Your home folders**: Documents, Downloads, Music, Pictures, Videos and the
   others, made at every login in your language, and listed in the file
   manager's sidebar.
-- **USB sticks, the trash can, and previews** of pictures and videos in the
-  file manager.
+- **The file manager's extras**: USB sticks, the trash can, search, and
+  previews of pictures, videos and documents.
+- **Opening files**: PDFs open in Firefox, videos in mpv, pictures in
+  swayimg. Programs that run in a terminal (btop, yazi, Neovim...) open in
+  Ghostty, from the app menu or the file manager.
+- **A password keyring**, so programs can remember your passwords, and
+  **GnuPG**.
+- **Everyday commands** an Arch system has: `htop`, `vim`, `wget`,
+  `killall`, `python3`, `openssl`, `sensors`, `smartctl`, `gpg` and more.
 - **A mouse cursor** for every program, and the **accessibility** service
   screen readers use.
 - **The firewall port** for LocalSend.
 - **The lock screen's password check.**
 
 Most of these are *defaults*: if you set one yourself, your choice wins. For
-example, if you prefer TLP for battery life, turn it on
-(`services.tlp.enable = true;`), and hyprsimple leaves power-profiles-daemon
-off.
+example:
+
+```nix
+  services.tlp.enable = true;                   # TLP instead of power modes
+  services.gnome.localsearch.enable = false;    # no file index for search
+  services.gnome.gnome-keyring.enable = false;  # no password keyring
+  programs.hyprsimple.excludePackages = [ pkgs.mpv pkgs.vim ];  # leave apps out
+```
 
 ---
 

@@ -36,23 +36,47 @@ let
   providedArchNames = lib.attrNames mapping ++ lib.optional cfg.muslimtify.enable "muslimtify";
 
   # What hyprsimple's scripts run that Arch has from its base system or as a
-  # dependency of something in packages.txt, so the lists never name it, and
-  # what a desktop environment would bring on a NixOS that has none.
+  # dependency of something in packages.txt, so the lists never name it.
   runtimeDependencies = with pkgs; [
     adwaita-icon-theme # the Adwaita cursor two themes ask for
     curl # hyprsimple-debug's upload
     dbus # dbus-monitor (the bar's idle watch), dbus-update-activation-environment
-    ffmpegthumbnailer # video previews in the file manager
     file
-    gdk-pixbuf # picture previews in the file manager (gdk-pixbuf-thumbnailer)
     glib # gsettings, used by the theme switcher
     gsettings-desktop-schemas
     pciutils # lspci, for the hardware checks
     pulseaudio # pactl; the sound server itself is PipeWire
     wirelesstools # iwconfig and iwlist, for the hotspot script
+    xdg-utils
+  ];
+
+  # What a fresh Arch install has, where hyprsimple's README expects it (Arch,
+  # with "Hyprland" picked in archinstall), and a NixOS without a desktop
+  # environment does not. Found by installing exactly that Arch system and
+  # comparing it with this module's NixOS, command by command and service by
+  # service. See docs/how-it-works.md.
+  desktopBasics = with pkgs; [
+    # The home folders and the file manager.
     xdg-user-dirs # Documents, Downloads, Music and the other home folders
     xdg-user-dirs-gtk # those folders in the file manager's sidebar
-    xdg-utils
+    gdk-pixbuf # previews of pictures (gdk-pixbuf-thumbnailer)
+    glycin-thumbnailer # previews of SVG, HEIF, JPEG XL and more
+    libgsf # previews of office documents
+    ffmpegthumbnailer # previews of videos (not on Arch; hyprsimple records to ~/Videos)
+    mpv # plays them; hyprsimple's window rules are written for mpv
+    desktop-file-utils # update-desktop-database, for apps you add by hand
+    gtk3 # gtk-launch
+    libsecret # secret-tool, for the password keyring
+    # Commands Arch's base system and archinstall's desktop profile bring.
+    gettext # envsubst
+    htop
+    lm_sensors # sensors
+    openssl
+    psmisc # killall, fuser, pstree
+    python3
+    smartmontools # smartctl
+    vim
+    wget
   ];
 in
 {
@@ -159,10 +183,19 @@ in
       withUWSM = true;
     };
 
-    # hyprlock needs a PAM service to check passwords. This is what
-    # programs.hyprlock would add, without also enabling services.hypridle:
-    # hyprsimple starts hypridle itself, and two would lock and dim twice.
-    security.pam.services.hyprlock = { };
+    security.pam.services = lib.mkMerge [
+      {
+        # hyprlock needs a PAM service to check passwords. This is what
+        # programs.hyprlock would add, without also enabling services.hypridle:
+        # hyprsimple starts hypridle itself, and two would lock and dim twice.
+        hyprlock = { };
+      }
+      # Unlock the password keyring when logging in through greetd, as the
+      # text console's `login` already does.
+      (lib.mkIf config.services.greetd.enable {
+        greetd.enableGnomeKeyring = lib.mkDefault true;
+      })
+    ];
 
     security.polkit.enable = true; # hyprpolkitagent
     programs.dconf.enable = true; # gsettings, which the theme switcher writes
@@ -177,6 +210,43 @@ in
     services.gnome.at-spi2-core.enable = lib.mkDefault true;
     # A cursor for every program that does not choose one itself.
     xdg.icons.fallbackCursorThemes = lib.mkDefault [ "Adwaita" ];
+
+    # ---- What a fresh Arch install has and a bare NixOS does not --------------
+
+    # linux-firmware. Arch always installs it. Without it, AMD graphics,
+    # most Wi-Fi cards and Bluetooth may not work at all.
+    hardware.enableRedistributableFirmware = lib.mkDefault true;
+    # A password keyring (the Secret Service), for programs that save
+    # passwords: browsers based on Chromium, VS Code, git and others. On Arch
+    # it comes along with the Hyprland profile (KWallet).
+    services.gnome.gnome-keyring.enable = lib.mkDefault true;
+    # The keyring's SSH agent is off on Arch, and it would collide with
+    # programs.ssh.startAgent; keep it off unless you turn it on.
+    services.gnome.gcr-ssh-agent.enable = lib.mkDefault false;
+    # GnuPG and its agent: pacman needs them, so every Arch system has them.
+    programs.gnupg.agent = {
+      enable = lib.mkDefault true;
+      pinentryPackage = lib.mkDefault pkgs.pinentry-gnome3;
+    };
+    # Search in the file manager, through its file index, as on Arch.
+    services.gnome.localsearch.enable = lib.mkDefault true;
+    services.gnome.tinysparql.enable = lib.mkDefault true;
+    # HTTPS and proxy support for GTK and GLib programs.
+    services.gnome.glib-networking.enable = lib.mkDefault true;
+    # JACK programs on PipeWire, which archinstall's PipeWire choice installs.
+    services.pipewire.jack.enable = lib.mkDefault true;
+    # Programs that run in a terminal (btop, htop, yazi, nvim...) opened from
+    # the app menu or the file manager. uwsm and GLib start them through
+    # xdg-terminal-exec, which even Arch is missing.
+    xdg.terminal-exec = {
+      enable = lib.mkDefault true;
+      settings.default = lib.mkDefault [ "com.mitchellh.ghostty.desktop" ];
+    };
+    # PDFs open in Firefox, as on Arch. NixOS's Firefox does not claim them.
+    xdg.mime = lib.mkIf (!isExcluded pkgs.firefox) {
+      defaultApplications."application/pdf" = lib.mkDefault "firefox.desktop";
+      addedAssociations."application/pdf" = lib.mkDefault "firefox.desktop";
+    };
 
     # ---- What hyprsimple's installer enables on Arch ------------------------
 
@@ -206,10 +276,15 @@ in
     environment.systemPackages =
       keep (lib.concatMap (e: e.packages or [ ]) (lib.attrValues mapping))
       ++ keep runtimeDependencies
+      ++ keep desktopBasics
       ++ [ cfg.package ]
       ++ lib.optional cfg.muslimtify.enable cfg.muslimtify.package;
 
-    fonts.packages = keep (lib.concatMap (e: e.fonts or [ ]) (lib.attrValues mapping));
+    fonts.packages =
+      keep (lib.concatMap (e: e.fonts or [ ]) (lib.attrValues mapping))
+      # GTK's own interface fonts, Adwaita Sans and Adwaita Mono. Arch always
+      # has them; without them GTK programs fall back to another font.
+      ++ keep [ pkgs.adwaita-fonts ];
 
     # gsettings from a script only finds the schemas it writes when they are
     # on XDG_DATA_DIRS. Applications carry their own; the command does not.
