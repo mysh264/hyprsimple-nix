@@ -21,19 +21,19 @@
 # files, the way hyprsimple expects them.
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "hyprsimple";
-  version = "0.4.5";
+  version = "0.4.8";
 
   src = fetchFromGitHub {
     owner = "rizukirr";
     repo = "hyprsimple";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-g8aKuGtN2wqP4GZL4hbgb6sdQVoi2+uy445CW4niLjg=";
+    hash = "sha256-/dnsJANuYTFMmbozGwyy9YzdAI3hmtMjwIir/Kw7RnY=";
   };
 
-  # Patches 1 to 4 only add a branch taken when /etc/hyprsimple/source exists,
-  # which the NixOS module creates; everywhere else those scripts behave
-  # exactly as upstream wrote them. Patch 5 fixes a bug that affects every
-  # distribution, until upstream has the fix.
+  # Patches 1 to 4 and 6 only add a branch taken when /etc/hyprsimple/source
+  # exists, which the NixOS module creates; everywhere else those scripts
+  # behave exactly as upstream wrote them. Patch 5 fixes a bug that affects
+  # every distribution, until upstream has the fix.
   patches = [
     # hyprsimple-update: take the version from the NixOS configuration instead
     # of git, and leave packages to NixOS instead of pacman.
@@ -48,6 +48,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # bashrc.sh: set zoxide up after starship, so zoxide stops warning on the
     # first `cd` of every terminal that it is "not initialized at the end".
     ./patches/0005-bashrc-initialize-zoxide-last.patch
+    # hyprsimple-session.sh: on NixOS, point to the setting that adds the
+    # "Hyprsimple" login entry, instead of writing to /usr/local/share.
+    ./patches/0006-nixos-login-entry.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a
@@ -139,6 +142,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     install -Dm644 -t $out/share/hyprsimple-nix/gpu ${./gpu}/*.part
     substituteInPlace $out/bin/hyprsimple-nixos \
       --replace-fail '@gpuParts@' "$out/share/hyprsimple-nix/gpu"
+
+    # The "Hyprsimple" login entry, written by hyprsimple-session.sh itself so
+    # that it stays exactly upstream's. programs.hyprsimple.loginEntry.enable
+    # installs it.
+    mkdir -p $out/share/hyprsimple-nix/wayland-sessions
+    HYPRSIMPLE_SESSION_DIR=$out/share/hyprsimple-nix/wayland-sessions \
+      ${lib.getExe bash} .local/bin/hyprsimple-session.sh
+    grep -qx 'Exec=uwsm start .*' $out/share/hyprsimple-nix/wayland-sessions/hyprsimple.desktop
 
     install -Dm755 ${./pacman-shim.sh} $out/libexec/hyprsimple-nix/shims/pacman
     substituteInPlace $out/libexec/hyprsimple-nix/shims/pacman \

@@ -251,8 +251,9 @@ type:
 hyprsimple-nixos status
 ```
 
-You should see `Provided by NixOS: hyprsimple 0.4.5` and `Not set up for
-<your name> yet`. Good: that is what step 4 does.
+You should see `Provided by NixOS: hyprsimple` with a version number (like
+`0.4.8`), and `Not set up for <your name> yet`. Good: that is what step 4
+does.
 
 ❌ **Got an error?** Read the first line that says `error:`. Most often it is
 a typing mistake in the file you changed: a missing `;`, `"` or `}`. Open the

@@ -1,0 +1,22 @@
+diff --git a/.local/bin/hyprsimple-session.sh b/.local/bin/hyprsimple-session.sh
+index 5f5d8ac..1eaa3ec 100755
+--- a/.local/bin/hyprsimple-session.sh
++++ b/.local/bin/hyprsimple-session.sh
+@@ -12,6 +12,17 @@
+ # HYPRSIMPLE_SESSION_DIR overrides the directory, for the test suite.
+ set -euo pipefail
+ 
++# hyprsimple-nix: on NixOS the login entry is part of the NixOS
++# configuration. A file in /usr/local/share/wayland-sessions would be read by
++# no login screen there.
++if [[ -e /etc/hyprsimple/source && -z ${HYPRSIMPLE_SESSION_DIR:-} ]]; then
++  echo "On NixOS, the Hyprsimple login entry is a setting in your NixOS configuration."
++  echo "Add this line to configuration.nix, and rebuild:"
++  echo "  programs.hyprsimple.loginEntry.enable = true;"
++  echo "Set it to false (or remove it) to take the entry away again."
++  exit 0
++fi
++
+ DIR="${HYPRSIMPLE_SESSION_DIR:-/usr/local/share/wayland-sessions}"
+ FILE="$DIR/hyprsimple.desktop"
+ 

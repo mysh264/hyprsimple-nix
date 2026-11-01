@@ -78,6 +78,23 @@ let
     vim
     wget
   ];
+
+  # The "Hyprsimple" login entry exactly as hyprsimple-session.sh writes it
+  # (the package keeps a copy), with uwsm's full path, as in Hyprland's own
+  # entries on NixOS. It is in the system profile too, so that
+  # `uwsm start hyprsimple.desktop` finds it.
+  loginEntry =
+    let
+      uwsm = lib.getExe config.programs.uwsm.package;
+    in
+    pkgs.runCommand "hyprsimple-login-entry" { passthru.providedSessions = [ "hyprsimple" ]; } ''
+      mkdir -p $out/share/wayland-sessions
+      sed -e 's|^Exec=uwsm |Exec=${uwsm} |' -e 's|^TryExec=uwsm$|TryExec=${uwsm}|' \
+        ${cfg.package}/share/hyprsimple-nix/wayland-sessions/hyprsimple.desktop \
+        > $out/share/wayland-sessions/hyprsimple.desktop
+      grep -qx 'Exec=${uwsm} start .*' $out/share/wayland-sessions/hyprsimple.desktop
+      grep -qx 'TryExec=${uwsm}' $out/share/wayland-sessions/hyprsimple.desktop
+    '';
 in
 {
   options.programs.hyprsimple = {
@@ -160,6 +177,14 @@ in
         does in ufw. NixOS's own firewall takes ufw's place.
       '';
     };
+
+    loginEntry.enable = lib.mkEnableOption ''
+      a "Hyprsimple" entry on the login screen, next to "Hyprland (UWSM)".
+      It starts the same configuration; it changes the name you pick, and puts
+      Hyprsimple into XDG_CURRENT_DESKTOP. This is what
+      {command}`hyprsimple-session.sh` (or {command}`install.sh --session-entry`)
+      adds on Arch. Text logins such as tuigreet's `--cmd` start it with
+      {command}`uwsm start hyprsimple.desktop`'';
   };
 
   config = lib.mkIf cfg.enable {
@@ -182,6 +207,18 @@ in
       # `uwsm stop`, so it needs the UWSM session.
       withUWSM = true;
     };
+
+    # NixOS 26.05 starts Hyprland through a wrapper that gives it the
+    # cap_sys_nice capability. A program started that way loses TZDIR, the
+    # place NixOS keeps time zones, and so does everything Hyprland starts:
+    # the bar, terminals, every app. Then named time zones read as UTC, and
+    # muslimtify showed "Asia/Dubai (UTC+0.0)" with prayer times hours early
+    # (NixOS/nixpkgs#526193). nixos-unstable removed the wrapper with
+    # Hyprland 0.57, and Arch never had it. Without it, Hyprland only cannot
+    # give itself realtime priority, which it cannot on Arch either.
+    security.wrappers.Hyprland.enable = lib.mkDefault false;
+
+    services.displayManager.sessionPackages = lib.optional cfg.loginEntry.enable loginEntry;
 
     security.pam.services = lib.mkMerge [
       {
@@ -278,7 +315,8 @@ in
       ++ keep runtimeDependencies
       ++ keep desktopBasics
       ++ [ cfg.package ]
-      ++ lib.optional cfg.muslimtify.enable cfg.muslimtify.package;
+      ++ lib.optional cfg.muslimtify.enable cfg.muslimtify.package
+      ++ lib.optional cfg.loginEntry.enable loginEntry;
 
     fonts.packages =
       keep (lib.concatMap (e: e.fonts or [ ]) (lib.attrValues mapping))

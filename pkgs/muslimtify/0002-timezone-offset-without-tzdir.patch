@@ -1,0 +1,103 @@
+diff --git a/src/platform/posix/timezone.c b/src/platform/posix/timezone.c
+index 04b7db9..b462116 100644
+--- a/src/platform/posix/timezone.c
++++ b/src/platform/posix/timezone.c
+@@ -15,35 +15,19 @@
+ #include <time.h>
+ #include <unistd.h>
+ 
+-double parse_timezone_offset(const char *tz_name, time_t when) {
+-  // A corrupted config value on the load path bypasses location_detect's
+-  // check, so the name is validated here as well.
+-  if (!timezone_name_is_valid(tz_name))
+-    return 0.0;
+-
+-  GTimeZone *tz = g_time_zone_new_identifier(tz_name);
+-  if (!tz)
+-    return 0.0;
+-
+-  gint64 instant = (gint64)when;
+-  gint interval = g_time_zone_find_interval(tz, G_TIME_TYPE_UNIVERSAL, instant);
+-  double offset = interval < 0 ? 0.0 : (double)g_time_zone_get_offset(tz, interval) / 3600.0;
+-  g_time_zone_unref(tz);
+-  return offset;
+-}
+-
+-// True if <dir>/<tz_name> is a regular file (a real tz database entry). stat
+-// follows symlinks; S_ISREG rejects namespace directories (e.g. "America").
+-static bool zone_file_in(const char *dir, const char *tz_name) {
+-  char path[512];
+-  int n = snprintf(path, sizeof(path), "%s/%s", dir, tz_name);
+-  if (n < 0 || (size_t)n >= sizeof(path))
++// True if <dir>/<tz_name> is a regular file (a real tz database entry), with
++// that file's path left in path. stat follows symlinks; S_ISREG rejects
++// namespace directories (e.g. "America").
++static bool zone_file_in(const char *dir, const char *tz_name, char *path, size_t cap) {
++  int n = snprintf(path, cap, "%s/%s", dir, tz_name);
++  if (n < 0 || (size_t)n >= cap)
+     return false;
+   struct stat st;
+   return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+ }
+ 
+-bool timezone_exists(const char *tz_name) {
++// Find the tz database file for tz_name, and leave its path in path.
++static bool zone_file(const char *tz_name, char *path, size_t cap) {
+   if (!timezone_name_is_valid(tz_name))
+     return false;
+ 
+@@ -53,7 +37,7 @@ bool timezone_exists(const char *tz_name) {
+   // does not make every real zone read as missing.
+   const char *tzdir = getenv("TZDIR");
+   if (tzdir && tzdir[0] != '\0')
+-    return zone_file_in(tzdir, tz_name);
++    return zone_file_in(tzdir, tz_name, path, cap);
+ 
+   static const char *const roots[] = {
+       "/usr/share/zoneinfo",
+@@ -62,12 +46,44 @@ bool timezone_exists(const char *tz_name) {
+       "/usr/share/lib/zoneinfo",
+   };
+   for (size_t i = 0; i < ARRAY_LEN(roots); i++) {
+-    if (zone_file_in(roots[i], tz_name))
++    if (zone_file_in(roots[i], tz_name, path, cap))
+       return true;
+   }
+   return false;
+ }
+ 
++bool timezone_exists(const char *tz_name) {
++  char path[512];
++  return zone_file(tz_name, path, sizeof(path));
++}
++
++double parse_timezone_offset(const char *tz_name, time_t when) {
++  // A corrupted config value on the load path bypasses location_detect's
++  // check, so the name is validated here as well.
++  if (!timezone_name_is_valid(tz_name))
++    return 0.0;
++
++  // GLib looks a name up under TZDIR, or under /usr/share/zoneinfo when TZDIR
++  // is unset, and nowhere else. A zone that timezone_exists found in one of
++  // the other roots was accepted, and then read as UTC+0: on NixOS, where the
++  // database is /etc/zoneinfo, every prayer time came out hours off for a
++  // program started without TZDIR. GLib also takes an absolute path, so it is
++  // given the file found here. The bare name stays the fallback, for a zone
++  // GLib knows without a file, such as "UTC".
++  char path[512];
++  GTimeZone *tz = zone_file(tz_name, path, sizeof(path)) ? g_time_zone_new_identifier(path) : NULL;
++  if (!tz)
++    tz = g_time_zone_new_identifier(tz_name);
++  if (!tz)
++    return 0.0;
++
++  gint64 instant = (gint64)when;
++  gint interval = g_time_zone_find_interval(tz, G_TIME_TYPE_UNIVERSAL, instant);
++  double offset = interval < 0 ? 0.0 : (double)g_time_zone_get_offset(tz, interval) / 3600.0;
++  g_time_zone_unref(tz);
++  return offset;
++}
++
+ static int copy_zone_tail(const char *path, char *buf, size_t cap) {
+   // Find the substring "/zoneinfo/" and take everything after it.
+   const char *needle = "/zoneinfo/";

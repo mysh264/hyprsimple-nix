@@ -102,6 +102,34 @@ hyprsimple opens network port 53317 in the firewall, so that
 [LocalSend](https://localsend.org) can send files between your devices. If
 you do not use LocalSend, you can close it with this line.
 
+### A "Hyprsimple" entry on the login screen
+
+```nix
+  programs.hyprsimple.loginEntry.enable = true;
+```
+
+Your login screen lists **Hyprland (UWSM)**, and with this line also
+**Hyprsimple**. Both start exactly the same desktop. The new name is only a
+label, the one hyprsimple's `install.sh --session-entry` adds on Arch.
+
+1. Add the line to `configuration.nix`, and rebuild.
+2. Log out. On a login screen with a list of sessions (SDDM, GDM, LightDM),
+   pick **Hyprsimple**.
+3. Do you log in with greetd and tuigreet, like the
+   [install guide](install.md)'s example? That login has no list. It starts
+   one command, the one after `--cmd`. Change that command to
+   `uwsm start hyprsimple.desktop`:
+
+   ```nix
+     services.greetd.settings.default_session.command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd 'uwsm start hyprsimple.desktop'";
+   ```
+
+   The same command starts it from a text console.
+
+To take it away, remove the line (or set it to `false`) and rebuild. On NixOS,
+hyprsimple's own `hyprsimple-session.sh` points here instead of changing
+anything.
+
 ### Your graphics card
 
 Graphics settings live in their own file, `gpu.nix`. See the
@@ -118,7 +146,12 @@ exactly that Arch system and comparing; see
 [How it works](how-it-works.md#how-we-know-nothing-is-missing).) You do not
 have to do anything, but it is good to know:
 
-- **Hyprland**, the desktop itself, with its helpers.
+- **Hyprland**, the desktop itself, with its helpers. Hyprland starts as on
+  Arch: NixOS 26.05 would start it through a special "capability" wrapper,
+  which made every program in your session lose its time zone information
+  (prayer times and clocks in other apps could be hours off).
+  nixos-unstable has already dropped that wrapper; hyprsimple-nix turns it
+  off on 26.05 too.
 - **The apps and tools** hyprsimple uses: about 80 of them. They are listed in
   [`modules/arch-packages.nix`](../modules/arch-packages.nix).
 - **Firmware** for graphics cards, Wi-Fi and Bluetooth chips.
@@ -169,7 +202,7 @@ version from hyprsimple's `main` branch instead, save this as a new file,
 {
   programs.hyprsimple.package =
     options.programs.hyprsimple.package.default.overrideAttrs {
-      version = "0.4.5-unstable-2026-11-01";
+      version = "0.4.8-unstable-2026-11-01";
       src = pkgs.fetchFromGitHub {
         owner = "rizukirr";
         repo = "hyprsimple";

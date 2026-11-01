@@ -30,6 +30,12 @@ stdenv.mkDerivation (finalAttrs: {
     # finds first. Unpatched that is the running program, a /nix/store path
     # that garbage collection removes after the next upgrade.
     ./0001-nixos-stable-daemon-path.patch
+    # The offset of a named zone was read by GLib under TZDIR or
+    # /usr/share/zoneinfo only, while the zone itself was also found in
+    # /etc/zoneinfo. Without TZDIR, NixOS got "Asia/Dubai (UTC+0.0)" and
+    # prayer times hours off. Also an upstream bug, on any system whose
+    # zoneinfo is not in /usr/share/zoneinfo.
+    ./0002-timezone-offset-without-tzdir.patch
   ];
 
   # One test asserts that the machine running it has a timezone configured in

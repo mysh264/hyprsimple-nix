@@ -18,6 +18,7 @@ do.
 [The lock screen does not take my password](#the-lock-screen-does-not-take-my-password) ·
 [zoxide warns about its configuration](#zoxide-warns-about-its-configuration) ·
 [A program other computers connect to does not work](#a-program-other-computers-connect-to-does-not-work) ·
+[lan-mouse does not share the mouse](#lan-mouse-does-not-share-the-mouse) ·
 [No sound, Wi-Fi or Bluetooth](#no-sound-wi-fi-or-bluetooth) ·
 [Prayer times are wrong or missing](#prayer-times-are-wrong-or-missing) ·
 [Home Manager complains](#home-manager-complains) ·
@@ -153,21 +154,110 @@ new terminal.
 ## A program other computers connect to does not work
 
 Like hyprsimple's firewall on Arch, NixOS's firewall stops other computers
-from connecting to yours, except for LocalSend. Programs that wait for
-connections need their port opened. For example, for
-[lan-mouse](https://github.com/feschber/lan-mouse) (UDP port 4242), add this
-to `configuration.nix` on **both** computers, and rebuild:
+from connecting to yours, except for LocalSend. A program that waits for
+other computers needs its port opened. Its own documentation says which one.
+For a program that uses UDP port 4242, add this to `configuration.nix`, and
+rebuild:
 
 ```nix
   networking.firewall.allowedUDPPorts = [ 4242 ];
 ```
 
-Each program's own documentation says which port it uses.
+(For a TCP port, it is `allowedTCPPorts`.)
 
-> 💡 lan-mouse may also say that `org.freedesktop.portal.InputCapture` was not
-> found. On NixOS 26.05, Hyprland's portal does not offer that yet (it is new
-> in nixos-unstable), so lan-mouse uses its other way of capturing the mouse
-> instead. It still works.
+## lan-mouse does not share the mouse
+
+[lan-mouse](https://github.com/feschber/lan-mouse) lets one mouse and
+keyboard control two computers. It is not part of hyprsimple, but it works
+with it: we tested two hyprsimple-nix computers on NixOS 26.05, and the mouse
+of one moved the pointer of the other, and came back. When it does not work,
+it is one of these four things. Check them in order.
+
+**1. Both computers need lan-mouse 0.11 or newer.**
+
+Type `lan-mouse --version` on both computers. lan-mouse 0.11 encrypts
+everything it sends, and lan-mouse 0.10 cannot understand that, so a 0.10
+and a 0.11 never connect. NixOS 26.05 comes with **0.10.0**. Arch, Windows,
+macOS and nixos-unstable have 0.11.
+
+To get 0.11 on NixOS 26.05, take lan-mouse from nixos-unstable. With a flake,
+open `/etc/nixos/flake.nix`:
+
+1. In `inputs`, add a line for nixos-unstable:
+
+   ```nix
+     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+   ```
+
+2. In the `outputs = { ... }` line, add `nixpkgs-unstable,` to the list. It
+   then looks like `outputs = { self, nixpkgs, nixpkgs-unstable, hyprsimple-nix, ... }:`.
+
+3. In the `modules = [ ... ]` list, add this:
+
+   ```nix
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.lan-mouse
+          ];
+        })
+   ```
+
+No flake? Then instead, add this to the `environment.systemPackages` list in
+`configuration.nix`:
+
+```nix
+    (import (builtins.fetchTarball "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz") {
+      system = pkgs.stdenv.hostPlatform.system;
+    }).lan-mouse
+```
+
+Either way, take out the old `lan-mouse` you added before (usually in
+`environment.systemPackages`), so only one is left. Rebuild, and check that
+`lan-mouse --version` says 0.11.
+
+**2. The computer that gets controlled must let lan-mouse in.**
+
+lan-mouse uses UDP port 4242. Open it on the computer whose pointer you want
+to move from the other one. On NixOS, add this to `configuration.nix`, and
+rebuild:
+
+```nix
+  networking.firewall.allowedUDPPorts = [ 4242 ];
+```
+
+On Arch with hyprsimple (its firewall is ufw), type
+`sudo ufw allow 4242/udp`. The computer that sends its mouse needs nothing
+opened. To go both ways, open the port on both.
+
+**3. The computer that gets controlled must trust the other one.**
+
+Since 0.11, lan-mouse only takes orders from computers you said yes to. Each
+computer has a long code, its *fingerprint*. You find it in lan-mouse's
+window, under **General**, as **certificate fingerprint** (with a button to
+copy it).
+
+1. Open lan-mouse on both computers.
+2. Push the mouse over to the other computer once (see 4 below).
+3. The computer that gets controlled shows a window, **Unauthorized
+   Device**, with the other computer's fingerprint. Check that it is the
+   same code the other computer shows under **General**, and press
+   **Authorize**.
+
+No window came? Copy the code on the computer that sends its mouse. Then, on
+the computer that gets controlled, press **Authorize** in lan-mouse's
+window, and paste it there. To go both ways, do this in both directions.
+
+**4. The first time, touch the edge twice.**
+
+Push the mouse against the screen edge where the other computer is. The
+first push only connects, and the pointer stays. Push again: now it goes
+over. Press **Ctrl + Shift + SUPER + Alt** together to get your mouse back.
+
+> 💡 lan-mouse may say that `org.freedesktop.portal.InputCapture` was not
+> found. That is fine. On NixOS 26.05, Hyprland's portal does not offer it
+> yet (nixos-unstable's does), so lan-mouse catches the mouse its other way,
+> with a strip one pixel wide at the screen's edge. That is what our test
+> used.
 
 ## No sound, Wi-Fi or Bluetooth
 
@@ -180,8 +270,16 @@ configuration does not turn them off, like `networking.networkmanager.enable = f
 
 ## Prayer times are wrong or missing
 
-Your place is not set yet. Click the prayer time on the bar, and press **s**
-for its settings. Or type:
+**The times are hours off, and `muslimtify location` says `UTC+0.0`**, even
+though your timezone is right (for example `Asia/Dubai`)? That was a bug,
+fixed in hyprsimple-nix. It came from two places: on NixOS 26.05, Hyprland
+started in a way that hid the time zone information from every program, and
+muslimtify could not find time zones without it. Update hyprsimple-nix and
+rebuild (see [Updating](update.md), part 1), then restart your computer. The
+right times come back by themselves; your settings stay as they are.
+
+**No prayer times, or the wrong city?** Your place is not set yet. Click the
+prayer time on the bar, and press **s** for its settings. Or type:
 
 ```sh
 muslimtify location set --auto

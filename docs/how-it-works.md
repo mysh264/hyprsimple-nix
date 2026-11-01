@@ -34,7 +34,17 @@ describes parts 1 and 2 the NixOS way:
 - what a desktop environment would bring on a NixOS that has none: the home
   folders (with `xdg-user-dirs`, at every login), previews of pictures and
   videos in the file manager, a fallback mouse cursor, and the accessibility
-  bus.
+  bus;
+- one change to NixOS's own Hyprland setup, on NixOS 26.05: it starts
+  Hyprland through a "capability" wrapper, so that Hyprland can give itself
+  realtime priority. A program started that way loses `TZDIR`, where NixOS
+  keeps its time zones, and so does everything it starts: every program in
+  the session then read named time zones as UTC
+  ([nixpkgs#526193](https://github.com/NixOS/nixpkgs/issues/526193)).
+  hyprsimple-nix turns the wrapper off, as nixos-unstable already did with
+  Hyprland 0.57, and as on Arch, which never had it;
+- the "Hyprsimple" login entry, when you ask for it
+  (`programs.hyprsimple.loginEntry.enable`).
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 
@@ -55,9 +65,9 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Five small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
-  The first four only do something when `/etc/hyprsimple/source` exists, so
-  hyprsimple on Arch would behave exactly as before:
+- Six small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+  All but the fifth only do something when `/etc/hyprsimple/source` exists,
+  so hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
      configuration, instead of downloading it with git.
   2. `hyprsimple-plugin` checks a plugin's packages against your NixOS
@@ -68,6 +78,9 @@ NixOS:
   4. `hyprsimple-debug` reports NixOS facts in its debug report.
   5. `bashrc.sh` sets zoxide up after starship. This one fixes a bug that
      also happens on Arch.
+  6. `hyprsimple-session.sh`, which adds the "Hyprsimple" login entry on
+     Arch, says which NixOS setting does it. (The entry itself is the one
+     that script writes: the package runs it once, at build time.)
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -115,9 +128,13 @@ hyprsimple-nix fixes both.
   programs follow the theme. hyprsimple selects it. Built from its release
   plus one fix from its repository, so it builds against current Qt.
 - **[muslimtify](https://github.com/muslimtify-org/muslimtify):** the prayer
-  times. It sets itself up as a user service. On NixOS a program's path
-  changes with every update, so a small patch makes that service point at
-  the stable path `/run/current-system/sw/bin/muslimtify`.
+  times, with two small patches. It sets itself up as a user service, and
+  on NixOS a program's path changes with every update, so the first patch
+  makes that service point at the stable path
+  `/run/current-system/sw/bin/muslimtify`. The second fixes a muslimtify bug:
+  it found a time zone in `/etc/zoneinfo` (where NixOS keeps them), but read
+  its offset only from `/usr/share/zoneinfo`, so without `TZDIR` every zone
+  was "UTC+0.0" and prayer times were hours off.
 - **Quickshell**, which draws the bar, comes from NixOS but is wrapped in
   two ways: it can show webp pictures (most wallpapers are webp), and it
   keeps the name `qs`, which hyprsimple uses to find its bar.
@@ -144,11 +161,14 @@ nix flake check   # the virtual machine test needs KVM
   runs `hyprsimple-install`; checks that every command hyprsimple's scripts
   use is there; starts bash, zsh and fish without warnings; checks which
   programs open PDFs, videos and folders, and that pictures, webp files and
-  videos get previews; starts Hyprland through UWSM; checks the bar,
-  notifications, helper services, home folders, keyring and search; opens a
-  terminal program the way the app menu does; copies and pastes; takes a
-  screenshot; switches the theme; runs `hyprsimple-update` with nothing new
-  and then with a changed version; and finally follows the
+  videos get previews; checks that muslimtify gets time zones right, with
+  and without `TZDIR`; starts Hyprland through UWSM; checks the bar,
+  notifications, helper services, home folders, keyring and search, and
+  that programs the session starts still know where the time zones are;
+  opens a terminal program the way the app menu does; copies and pastes;
+  takes a screenshot; switches the theme; runs `hyprsimple-update` with
+  nothing new and then with a changed version; logs in again through the
+  "Hyprsimple" login entry; and finally follows the
   [removal guide](uninstall.md) and checks that the old settings came back.
 
 All of this runs on every change, on both NixOS 26.05 and nixos-unstable.
