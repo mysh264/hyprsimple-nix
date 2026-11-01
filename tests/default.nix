@@ -139,7 +139,8 @@ in
       ''
         shellcheck --shell=bash \
           ${../pkgs/hyprsimple/hyprsimple-nixos.sh} \
-          ${../pkgs/hyprsimple/pacman-shim.sh}
+          ${../pkgs/hyprsimple/pacman-shim.sh} \
+          ${../pkgs/hyprsimple/systemctl-shim.sh}
         tree=${p.hyprsimple}/share/hyprsimple
         for f in $tree/.local/bin/*.sh $tree/.local/bin/hyprsimple-plugin $tree/migrations/*.sh; do
           [[ $f == */zsh.sh ]] && continue

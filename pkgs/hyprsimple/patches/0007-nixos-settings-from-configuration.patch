@@ -1,0 +1,26 @@
+diff --git a/default/hypr/hyprsimple.lua b/default/hypr/hyprsimple.lua
+index c2db4c2..82313f5 100644
+--- a/default/hypr/hyprsimple.lua
++++ b/default/hypr/hyprsimple.lua
+@@ -7,3 +7,21 @@ require("default.hypr.looknfeel")
+ require("default.hypr.windows")
+ require("default.hypr.bindings")
+ require("default.hypr.autostart")
++
++-- hyprsimple-nix: what the NixOS configuration adds, from programs.hyprsimple
++-- (workspace names, keys for window groups). After the defaults above and
++-- before your files in ~/.config/hypr, so your settings still win.
++do
++  local file = "/etc/hyprsimple/hyprland.lua"
++  local f = io.open(file, "r")
++  if f then
++    f:close()
++    local ok, err = pcall(dofile, file)
++    if not ok then
++      local message = (tostring(err):gsub("'", ""):gsub("%s+", " "))
++      hl.on("hyprland.start", function()
++        hl.exec_cmd("notify-send -u critical 'hyprsimple: a config file did not load' '" .. message .. "'")
++      end)
++    end
++  end
++end

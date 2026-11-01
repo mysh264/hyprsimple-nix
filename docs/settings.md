@@ -66,6 +66,75 @@ Firefox; without Firefox it does nothing.
 > 💡 Need `pkgs` for this? The first line of `configuration.nix` should list
 > it: `{ config, pkgs, ... }:`. It usually does.
 
+### Name your workspaces
+
+```nix
+  programs.hyprsimple.workspaces.names = [ "Web" "Code" "Term" "Files" ];
+```
+
+Your workspaces get names, in order: the first name is workspace 1, the
+second is workspace 2, and so on. The bar at the top shows the names instead
+of small dots, and it always shows the workspaces you named, even when they
+are empty, so you always know where everything goes.
+
+1. Add the line to `configuration.nix`, with your own names, and rebuild.
+2. Type `hyprctl reload` (or log out and in). The names appear on the bar.
+
+Good to know:
+
+- **SUPER + 1** to **SUPER + 0** go to workspaces 1 to 10. A workspace after
+  10 has no key, but you can click it on the bar, or scroll over the bar to
+  walk through all of them. Want a key anyway? Add a line like this to
+  `~/.config/hypr/bindings/applications.lua`:
+
+  ```lua
+  hl.bind("SUPER + F11", hl.dsp.focus({ workspace = "11" }), { description = "Workspace 11" })
+  ```
+
+- Naming workspaces the Hyprland way, with `hl.workspace_rule` and
+  `default_name` in your own files in `~/.config/hypr`, works too. The bar
+  shows those names the same way.
+
+### Window groups (tabs)
+
+```nix
+  programs.hyprsimple.groups.enable = true;
+```
+
+A group is several windows stacked in one place, like the tabs in a web
+browser: you see one window, and a bar of tabs above it shows the others. It
+is the "tabbed" layout of i3. hyprsimple has no keys for groups; this line
+adds them. The tabs take the colours of your theme.
+
+1. Add the line to `configuration.nix`, and rebuild.
+2. Type `hyprctl reload` (or log out and in).
+3. Press **SUPER + /** to see the new keys among the others.
+
+| Press | What happens |
+|---|---|
+| **SUPER + G** | The window you are on becomes a group, with a tab bar. Press it again to undo the group. |
+| *(open a window)* | A window you open while you are in a group joins that group. |
+| **SUPER + ALT + ←** (or →, ↑, ↓) | Moves the window you are on into the group on that side. **H, L, K, J** work too. |
+| **SUPER + ALT + G** | Takes the window you are on out of its group. |
+| **SUPER + ALT + TAB** | Next window in the group. Add **SHIFT** for the one before. The mouse wheel works too, with **SUPER + ALT**. |
+| **SUPER + ALT + 1** … **9** | Window 1 … 9 of the group. |
+| **SUPER + H** / **L** | Go through the group's windows first, then on to the windows next to it, like i3. |
+| **SUPER + Q** | Closes the window you are on, and only that one. |
+
+With the mouse: click a tab to see that window, click a tab with the middle
+mouse button to close that window, and drag a window onto a group (hold
+**SUPER** and the left mouse button) to put it in.
+
+**Closing a window never closes the rest of its group.** It does not matter
+which one you close, the first one or any other: the others stay, as a
+group. Our tests check exactly that.
+
+> 💡 One thing is not about groups. A program you start by typing its name
+> in a terminal can belong to that terminal, and then it closes when you
+> close the terminal. To keep it open, start it from the app menu, or start
+> it like this: `setsid -f nautilus` (with your program instead of
+> `nautilus`).
+
 ### Prayer times on the bar
 
 hyprsimple shows prayer times on the bar, through a plugin called
@@ -236,5 +305,10 @@ overwrites your changes to them.
 | Your default terminal, browser, file manager | `~/.config/hypr/vars.lua` |
 
 Each file explains itself with notes at the top. After saving, type
-`hyprctl reload` in a terminal. hyprsimple's own
+`hyprctl reload` in a terminal.
+
+> ⚠️ Don't change the files in `~/.local/share/hyprsimple`. Those are
+> hyprsimple's own, and `hyprsimple-update` replaces them with every new
+> version. While they have changes of yours, it stops, and you get no
+> updates. Put your changes in the files above instead. hyprsimple's own
 [README](https://github.com/rizukirr/hyprsimple#readme) tells you much more.

@@ -44,7 +44,11 @@ describes parts 1 and 2 the NixOS way:
   hyprsimple-nix turns the wrapper off, as nixos-unstable already did with
   Hyprland 0.57, and as on Arch, which never had it;
 - the "Hyprsimple" login entry, when you ask for it
-  (`programs.hyprsimple.loginEntry.enable`).
+  (`programs.hyprsimple.loginEntry.enable`);
+- two extras hyprsimple does not have (yet), off until you turn them on:
+  workspace names on the bar (`programs.hyprsimple.workspaces.names`) and
+  keys for window groups (`programs.hyprsimple.groups.enable`). They become
+  Lua in `/etc/hyprsimple/hyprland.lua`, which hyprsimple's own config loads.
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 
@@ -53,7 +57,9 @@ It also puts a few files in `/etc/hyprsimple`, for the tools below:
 | `/etc/hyprsimple/source` | the hyprsimple version this system provides |
 | `/etc/hyprsimple/arch-packages` | the Arch package names this system provides |
 | `/etc/hyprsimple/settings` | the module's settings, like the first theme |
+| `/etc/hyprsimple/hyprland.lua` | what your settings add to Hyprland's configuration |
 | `/etc/hyprsimple/shims/pacman` | a stand-in for `pacman`, explained below |
+| `/etc/hyprsimple/shims/systemctl` | a stand-in for `systemctl`, explained below |
 
 ### 2. hyprsimple, prepared for NixOS (`pkgs/hyprsimple`)
 
@@ -65,22 +71,32 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Six small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
-  All but the fifth only do something when `/etc/hyprsimple/source` exists,
-  so hyprsimple on Arch would behave exactly as before:
+- Nine small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+  Numbers 1 to 4, 6 and 7 only do something when `/etc/hyprsimple` exists, so
+  hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
      configuration, instead of downloading it with git.
   2. `hyprsimple-plugin` checks a plugin's packages against your NixOS
      configuration, instead of installing them with pacman.
-  3. `hyprsimple-migrate` puts the pacman stand-in first in line, so that
-     migrations written for Arch, which ask pacman "is this installed?", get
-     a true answer from your NixOS configuration.
+  3. `hyprsimple-migrate` puts the stand-ins first in line. Migrations
+     written for Arch ask pacman "is this installed?", and get a true answer
+     from your NixOS configuration. And after a migration turns a service on
+     with `systemctl --user enable`, the systemctl stand-in makes sure it
+     still comes from your current system (see below).
   4. `hyprsimple-debug` reports NixOS facts in its debug report.
   5. `bashrc.sh` sets zoxide up after starship. This one fixes a bug that
      also happens on Arch.
   6. `hyprsimple-session.sh`, which adds the "Hyprsimple" login entry on
      Arch, says which NixOS setting does it. (The entry itself is the one
      that script writes: the package runs it once, at build time.)
+  7. `hyprsimple.lua`, hyprsimple's own Hyprland config, also loads
+     `/etc/hyprsimple/hyprland.lua`: after hyprsimple's defaults, before
+     your own files, so your settings still win.
+  8. The bar shows a workspace's name instead of its dot, when it has one,
+     and always shows workspaces that a rule names. Without names, it is the
+     bar as before.
+  9. The theme templates give window groups the theme's colours. Without
+     groups, nobody sees them.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -92,6 +108,15 @@ instead of quietly shipping something broken.
   hyprsimple's files to `~/.local/share/hyprsimple`, copies the settings
   and scripts, turns on the user services, applies the first theme, and
   installs the default plugin.
+
+  On NixOS, `systemctl --user enable` has a trap: for a service the system
+  ships, like hyprpaper, it links that day's version from `/nix/store` into
+  `~/.config/systemd/user`, and systemd keeps using it, through every update,
+  until a garbage collection deletes it. Then the wallpaper, the password
+  window and the night light are gone. So hyprsimple-nix points those links
+  back at `/etc/systemd/user`, where the current system keeps its services:
+  when it installs, at every `hyprsimple-update` (which also repairs installs
+  from before), and after migrations.
 - **`hyprsimple-nixos sync`** is what `hyprsimple-update` calls to bring in
   a new version.
 - **`hyprsimple-nixos gpu`** looks at your graphics hardware, as
@@ -162,12 +187,17 @@ nix flake check   # the virtual machine test needs KVM
   use is there; starts bash, zsh and fish without warnings; checks which
   programs open PDFs, videos and folders, and that pictures, webp files and
   videos get previews; checks that muslimtify gets time zones right, with
-  and without `TZDIR`; starts Hyprland through UWSM; checks the bar,
+  and without `TZDIR`; checks that the user services come from the current
+  system; starts Hyprland through UWSM; checks the bar,
   notifications, helper services, home folders, keyring and search, and
   that programs the session starts still know where the time zones are;
   opens a terminal program the way the app menu does; copies and pastes;
-  takes a screenshot; switches the theme; runs `hyprsimple-update` with
-  nothing new and then with a changed version; logs in again through the
+  takes a screenshot; switches the theme; turns on workspace names and
+  window groups with a rebuild, groups three terminals with the keys, takes
+  one out and puts it back, and closes them one by one, the first one first,
+  checking each time that only that one closed; runs `hyprsimple-update`
+  with nothing new (repairing a service tied to `/nix/store` on the way) and
+  then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the
   [removal guide](uninstall.md) and checks that the old settings came back.
 

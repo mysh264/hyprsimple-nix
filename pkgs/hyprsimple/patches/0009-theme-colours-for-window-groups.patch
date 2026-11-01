@@ -1,0 +1,26 @@
+diff --git a/.config/hypr/themes/templates/hyprland-colors.lua.tpl b/.config/hypr/themes/templates/hyprland-colors.lua.tpl
+index 04c0603..b840a79 100644
+--- a/.config/hypr/themes/templates/hyprland-colors.lua.tpl
++++ b/.config/hypr/themes/templates/hyprland-colors.lua.tpl
+@@ -5,4 +5,21 @@ hl.config({
+       inactive_border = "rgb({{ color8_strip }})",
+     },
+   },
++  -- hyprsimple-nix: window groups in the theme's colours, the way the bar
++  -- draws its workspaces: the active tab in the accent with the background
++  -- colour on it, the others on the bar's surface.
++  group = {
++    col = {
++      border_active = "rgb({{ accent_strip }})",
++      border_inactive = "rgb({{ color8_strip }})",
++    },
++    groupbar = {
++      text_color = "rgb({{ background_strip }})",
++      text_color_inactive = "rgb({{ foreground_strip }})",
++      col = {
++        active = "rgb({{ accent_strip }})",
++        inactive = "rgb({{ surface_strip }})",
++      },
++    },
++  },
+ })

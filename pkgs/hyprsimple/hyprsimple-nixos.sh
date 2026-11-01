@@ -166,6 +166,8 @@ deliver() {
 cmd_sync() {
   require_module
   [[ -d $HYPRSIMPLE_PATH ]] || die "hyprsimple is not set up for $(id -un) yet. Run hyprsimple-install."
+  # First, so that it happens even when the delivery below stops.
+  repair_user_units
   local before after
   before=$(cat "$HYPRSIMPLE_PATH/version" 2>/dev/null || echo unknown)
   deliver
@@ -352,6 +354,45 @@ copy_scripts() {
 
 user_manager_up() { systemctl --user show-environment >/dev/null 2>&1; }
 
+# On NixOS, `systemctl --user enable` of a unit the system ships (hyprpaper,
+# hyprpolkitagent, hyprsunset) links that unit's file from /nix/store into
+# ~/.config/systemd/user. systemd then reads that file instead of the
+# system's: the version installed that day, kept after every update and
+# rebuild, and gone with the next garbage collection, which leaves no
+# wallpaper, no password prompts and no night light. This points every such
+# link back at /etc/systemd/user, which always holds the current system's
+# unit. A unit file link is removed (the one in /etc/systemd/user takes its
+# place); a wants link is repointed. Says whether anything changed.
+UNPINNED=()
+unpin_user_units() {
+  local dir=$HOME/.config/systemd/user link name
+  UNPINNED=()
+  [[ -d $dir ]] || return 1
+  while IFS= read -r -d '' link; do
+    name=$(basename "$link")
+    [[ $(readlink "$link") == /nix/store/* && -e /etc/systemd/user/$name ]] || continue
+    if [[ $(dirname "$link") == "$dir" ]]; then
+      rm -f -- "$link"
+      UNPINNED+=("$name")
+    else
+      ln -sfn -- "/etc/systemd/user/$name" "$link"
+    fi
+  done < <(find "$dir" -maxdepth 2 -type l -print0)
+  ((${#UNPINNED[@]} > 0))
+}
+
+# For hyprsimple-update, and installs from before the fix: repoint the units,
+# and restart the ones the session runs, so the current version runs now.
+repair_user_units() {
+  unpin_user_units || return 0
+  user_manager_up || return 0
+  systemctl --user daemon-reload
+  if systemctl --user is-active --quiet graphical-session.target; then
+    systemctl --user restart "${UNPINNED[@]}" >/dev/null 2>&1 || true
+  fi
+  good "Now from your current system: ${UNPINNED[*]}"
+}
+
 enable_user_units() {
   if ! user_manager_up; then
     note "Your systemd user manager is not reachable from here, so the user services"
@@ -384,6 +425,10 @@ enable_user_units() {
   for unit in hyprpaper.service hyprpolkitagent.service; do
     systemctl --user enable "$unit" >/dev/null 2>&1 || FAILED+=("systemctl --user enable $unit")
   done
+  # Enabled, but without the links into /nix/store that enable leaves.
+  if unpin_user_units; then
+    systemctl --user daemon-reload
+  fi
   if systemctl --user is-active --quiet graphical-session.target; then
     systemctl --user start hyprpaper.service hyprpolkitagent.service >/dev/null 2>&1 || true
   fi
@@ -846,6 +891,8 @@ case $command in
   check-packages) cmd_check_packages "$@" ;;
   status) cmd_status "$@" ;;
   gpu) cmd_gpu "$@" ;;
+  # For the systemctl stand-in that hyprsimple's migrations run.
+  unpin-units) repair_user_units ;;
   -h | --help | help | "") usage ;;
   *)
     usage >&2

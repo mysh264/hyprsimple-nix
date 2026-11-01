@@ -14,6 +14,7 @@ do.
 [hyprsimple-install complains](#hyprsimple-install-complains) ·
 [Hyprland does not start](#hyprland-does-not-start) ·
 [No bar at the top](#no-bar-at-the-top) ·
+[No wallpaper, or no password window](#no-wallpaper-or-no-password-window) ·
 [The file manager shows only Pictures and Videos](#the-file-manager-shows-only-pictures-and-videos) ·
 [The lock screen does not take my password](#the-lock-screen-does-not-take-my-password) ·
 [zoxide warns about its configuration](#zoxide-warns-about-its-configuration) ·
@@ -73,10 +74,19 @@ that starts with `error:`. Then find it here:
 - **`this NixOS configuration does not enable hyprsimple`**: add
   `programs.hyprsimple.enable = true;` and rebuild.
 
-- **`~/.local/share/hyprsimple has local changes`**: someone changed
-  hyprsimple's own files there. hyprsimple-nix will not overwrite them. To
-  throw those changes away, type `git -C ~/.local/share/hyprsimple reset --hard`
-  and run it again.
+- **`~/.local/share/hyprsimple has local changes`** (from `hyprsimple-update`
+  too): someone changed hyprsimple's own files there, and hyprsimple-nix will
+  not overwrite them. To put the changes aside, so you can still look at them
+  later, type:
+
+  ```sh
+  git -C ~/.local/share/hyprsimple stash --include-untracked
+  ```
+
+  and run it again. (`git -C ~/.local/share/hyprsimple stash show -p` shows
+  them, `... stash pop` brings them back.) Changes of your own belong in
+  `~/.config/hypr`: see
+  [Your desktop's own settings](settings.md#your-desktops-own-settings).
 
 - **`... are links into /nix/store, which usually means Home Manager owns
   them`**: see [Home Manager complains](#home-manager-complains).
@@ -114,6 +124,24 @@ open a terminal (**SUPER + T**) and type:
 ```sh
 ~/.local/bin/hyprsimple-restart-bar.sh
 ```
+
+## No wallpaper, or no password window
+
+The background stays black, a program that needs your password shows no
+window to type it in, or the night light stays off. It often starts after an
+update, or after you moved your NixOS to another version (for example from
+26.05 to unstable).
+
+That was a mistake in hyprsimple-nix's installer, now fixed. It tied the
+three helpers behind these (hyprpaper, hyprpolkitagent and hyprsunset) to the
+exact versions of the day you installed. After an update your session kept
+starting the old ones, and once NixOS cleaned old versions away, nothing at
+all. To fix it:
+
+1. Update hyprsimple-nix and rebuild (see [Updating](update.md), part 1).
+2. Type `hyprsimple-update`. Before anything else, it ties the helpers to
+   your current system again, and restarts them. The wallpaper is back right
+   away, even if `hyprsimple-update` then stops for another reason.
 
 ## The file manager shows only Pictures and Videos
 

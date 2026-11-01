@@ -1,0 +1,174 @@
+diff --git a/default/quickshell/bar/Workspaces.qml b/default/quickshell/bar/Workspaces.qml
+index 6d3f411..bceae54 100644
+--- a/default/quickshell/bar/Workspaces.qml
++++ b/default/quickshell/bar/Workspaces.qml
+@@ -1,39 +1,118 @@
+ import QtQuick
+ import Quickshell.Hyprland
++import Quickshell.Io
+ import qs.theme
+ import qs.components
+ 
+ // Workspace capsule. 1 to 5 are always shown, higher ones while they exist.
+ // Each is a dot, small and dim when empty, and an accent pill slides to the focused one.
++//
++// hyprsimple-nix: a workspace with a name shows the name instead of the dot, and
++// one named by a workspace rule is always shown, also while it is empty. Names
++// come from Hyprland: a rule's default_name, or a name given at runtime.
++// Without any names this is the capsule above, unchanged.
+ Rectangle {
+     id: root
+ 
+     required property var monitor
++
++    // Workspace id to default_name, from Hyprland's workspace rules. Read at the
++    // start and again whenever Hyprland reloads its configuration.
++    property var ruleNames: ({})
++    // Every named workspace, id to name. A name the workspace has now (one that
++    // is not just its number) wins over the rule's.
++    readonly property var names: {
++        const all = Object.assign({}, root.ruleNames)
++        for (const w of Hyprland.workspaces.values) {
++            if (w.id > 0 && w.name && w.name !== String(w.id)) all[w.id] = w.name
++        }
++        return all
++    }
++    readonly property bool named: Object.keys(names).length > 0
++
+     readonly property var ids: {
+         const existing = Hyprland.workspaces.values.map(w => w.id).filter(id => id > 0)
+-        return [...new Set([1, 2, 3, 4, 5, ...existing])].sort((a, b) => a - b)
++        const ruled = Object.keys(root.ruleNames).map(Number)
++        return [...new Set([1, 2, 3, 4, 5, ...ruled, ...existing])].sort((a, b) => a - b)
+     }
+     readonly property int activeId: monitor?.activeWorkspace?.id ?? 1
+     readonly property int activeIndex: Math.max(0, ids.indexOf(activeId))
+     // Wheel delta collected until one notch (120), so touchpads do not skip workspaces.
+     property real wheelDelta: 0
+ 
++    // A dot's cell, or with names one wide enough for the longest label, so the
++    // accent pill still moves in equal steps.
++    readonly property real cellWidth: {
++        if (!named) return Theme.workspaceCell
++        let widest = 0
++        for (const id of ids) widest = Math.max(widest, labelMetrics.advanceWidth(names[id] ?? String(id)))
++        return Math.max(Theme.workspaceCell, Math.ceil(widest) + 2 * Theme.sm)
++    }
++
+     function switchTo(target) {
+         Hyprland.dispatch(`hl.dsp.focus({ workspace = "${target}" })`)
+     }
+ 
+-    implicitWidth: ids.length * Theme.workspaceCell + 2 * Theme.xs
++    // One notch of the wheel. With names it steps through the capsule as shown,
++    // where a named workspace is there before it has a window; "e+1" would skip it.
++    function step(delta) {
++        if (!named) {
++            switchTo(delta < 0 ? "e-1" : "e+1")
++            return
++        }
++        const at = ids.indexOf(activeId)
++        const next = ids[((at < 0 ? 0 : at) + delta + ids.length) % ids.length]
++        if (next !== activeId) switchTo(next)
++    }
++
++    implicitWidth: ids.length * cellWidth + 2 * Theme.xs
+     implicitHeight: Theme.capsule
+     radius: Theme.capsuleRadius
+     color: Theme.surface
+     Behavior on color { CAnim {} }
+     Behavior on implicitWidth { Anim {} }
+ 
++    FontMetrics {
++        id: labelMetrics
++        font.family: Theme.font
++        font.pixelSize: Theme.fontSize
++        font.bold: true
++    }
++
++    Process {
++        id: rules
++        command: ["hyprctl", "workspacerules", "-j"]
++        stdout: StdioCollector {
++            id: rulesOut
++            onStreamFinished: {
++                const fromRules = {}
++                try {
++                    for (const rule of JSON.parse(rulesOut.text)) {
++                        // Only rules for one numbered workspace; "r[1-5]", "name:..."
++                        // and "special:..." are not a place on the capsule.
++                        if (/^[1-9][0-9]*$/.test(rule.workspaceString ?? "") && rule.defaultName)
++                            fromRules[Number(rule.workspaceString)] = rule.defaultName
++                    }
++                } catch (e) {
++                    // No Hyprland to ask, or an answer that is not JSON: no names.
++                }
++                root.ruleNames = fromRules
++            }
++        }
++    }
++    Component.onCompleted: rules.running = true
++    Connections {
++        target: Hyprland
++        function onRawEvent(event) {
++            if (event.name === "configreloaded") rules.running = true
++        }
++    }
++
+     WheelHandler {
+         onWheel: event => {
+             root.wheelDelta += event.angleDelta.y
+             if (Math.abs(root.wheelDelta) < 120) return
+-            root.switchTo(root.wheelDelta > 0 ? "e-1" : "e+1")
++            root.step(root.wheelDelta > 0 ? -1 : 1)
+             root.wheelDelta = 0
+         }
+     }
+@@ -43,15 +122,15 @@ Rectangle {
+     Rectangle {
+         id: indicator
+ 
+-        readonly property real target: Theme.xs + root.activeIndex * Theme.workspaceCell
++        readonly property real target: Theme.xs + root.activeIndex * root.cellWidth
+         property bool forward: true
+         property real start: target
+-        property real end: target + Theme.workspaceCell
++        property real end: target + root.cellWidth
+ 
+         onTargetChanged: {
+             forward = target > start
+             start = target
+-            end = target + Theme.workspaceCell
++            end = target + root.cellWidth
+         }
+ 
+         x: start
+@@ -80,10 +159,11 @@ Rectangle {
+                 readonly property bool focused: root.activeId === modelData
+                 readonly property bool occupied: (workspace?.toplevels.values.length ?? 0) > 0
+ 
+-                width: Theme.workspaceCell
++                width: root.cellWidth
+                 height: parent.height
+ 
+                 Rectangle {
++                    visible: !root.named
+                     anchors.centerIn: parent
+                     width: Theme.dotSize
+                     height: Theme.dotSize
+@@ -94,6 +174,15 @@ Rectangle {
+                     Behavior on scale { Anim {} }
+                 }
+ 
++                // With names, every workspace is a word: its name, or its number.
++                StyledText {
++                    visible: root.named
++                    anchors.centerIn: parent
++                    text: root.names[cell.modelData] ?? String(cell.modelData)
++                    color: cell.focused ? Theme.onAccent : cell.occupied ? Theme.fg : Theme.muted
++                    font.bold: cell.focused
++                }
++
+                 // Same height as the accent pill.
+                 StateLayer {
+                     id: layer

@@ -30,10 +30,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     hash = "sha256-/dnsJANuYTFMmbozGwyy9YzdAI3hmtMjwIir/Kw7RnY=";
   };
 
-  # Patches 1 to 4 and 6 only add a branch taken when /etc/hyprsimple/source
-  # exists, which the NixOS module creates; everywhere else those scripts
+  # Patches 1 to 4, 6 and 7 only add a branch taken when /etc/hyprsimple
+  # exists, which the NixOS module creates; everywhere else those files
   # behave exactly as upstream wrote them. Patch 5 fixes a bug that affects
-  # every distribution, until upstream has the fix.
+  # every distribution, until upstream has the fix. Patches 8 and 9 are
+  # extras that stay invisible until the module's settings turn them on.
   patches = [
     # hyprsimple-update: take the version from the NixOS configuration instead
     # of git, and leave packages to NixOS instead of pacman.
@@ -51,6 +52,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # hyprsimple-session.sh: on NixOS, point to the setting that adds the
     # "Hyprsimple" login entry, instead of writing to /usr/local/share.
     ./patches/0006-nixos-login-entry.patch
+    # hyprsimple.lua: load what programs.hyprsimple adds to Hyprland's
+    # configuration (workspace names, window group keys), from /etc/hyprsimple.
+    ./patches/0007-nixos-settings-from-configuration.patch
+    # Two extras, which change nothing until they are used. The bar shows
+    # workspace names instead of dots...
+    ./patches/0008-bar-workspace-names.patch
+    # ...and window groups take the theme's colours.
+    ./patches/0009-theme-colours-for-window-groups.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a
@@ -154,6 +163,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     install -Dm755 ${./pacman-shim.sh} $out/libexec/hyprsimple-nix/shims/pacman
     substituteInPlace $out/libexec/hyprsimple-nix/shims/pacman \
       --replace-fail '#!/usr/bin/env bash' '#!${lib.getExe bash}'
+    install -Dm755 ${./systemctl-shim.sh} $out/libexec/hyprsimple-nix/shims/systemctl
+    substituteInPlace $out/libexec/hyprsimple-nix/shims/systemctl \
+      --replace-fail '#!/usr/bin/env bash' '#!${lib.getExe bash}' \
+      --replace-fail '@hyprsimpleNixos@' "$out/bin/hyprsimple-nixos"
 
     runHook postInstall
   '';

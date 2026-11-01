@@ -79,6 +79,75 @@ let
     wget
   ];
 
+  # A Lua string, for the names put into Hyprland's configuration below.
+  luaString = text: "\"" + lib.escape [ "\\" "\"" ] text + "\"";
+
+  # What programs.hyprsimple adds to Hyprland's configuration. hyprsimple's
+  # own defaults load it (patch 0007), before the user's files in ~/.config.
+  hyprlandLua = lib.concatStringsSep "\n" (
+    [
+      ''
+        -- Written by hyprsimple-nix from programs.hyprsimple in your NixOS
+        -- configuration. Change the settings there and rebuild: this file is
+        -- replaced every time.
+      ''
+    ]
+    ++ lib.optional (cfg.workspaces.names != [ ]) (
+      ''
+        -- Workspace names (programs.hyprsimple.workspaces.names). The bar
+        -- shows them, and always shows these workspaces.
+      ''
+      + lib.concatImapStrings (
+        number: name:
+        "hl.workspace_rule({ workspace = \"${toString number}\", default_name = ${luaString name} })\n"
+      ) cfg.workspaces.names
+    )
+    ++ lib.optional cfg.groups.enable ''
+      -- Window groups (programs.hyprsimple.groups.enable): windows stacked in
+      -- one place, with a tab for each. SUPER + Q still closes only the window
+      -- you are on; the rest of its group stays.
+      hl.bind("SUPER + G", hl.dsp.group.toggle(), { description = "Group Windows / Ungroup" })
+      hl.bind("SUPER + ALT + G", hl.dsp.window.move({ out_of_group = true }), { description = "Take Window out of Group" })
+      for _, way in ipairs({
+        { "LEFT", "l", "Left" }, { "RIGHT", "r", "Right" }, { "UP", "u", "Up" }, { "DOWN", "d", "Down" },
+        { "H", "l", "Left" }, { "L", "r", "Right" }, { "K", "u", "Up" }, { "J", "d", "Down" },
+      }) do
+        hl.bind("SUPER + ALT + " .. way[1], hl.dsp.window.move({ into_group = way[2] }),
+          { description = "Move Window into Group " .. way[3] })
+      end
+      hl.bind("SUPER + ALT + TAB", hl.dsp.group.next(), { description = "Next Window in Group" })
+      hl.bind("SUPER + ALT + SHIFT + TAB", hl.dsp.group.prev(), { description = "Previous Window in Group" })
+      hl.bind("SUPER + ALT + mouse_down", hl.dsp.group.next(), { description = "Next Window in Group" })
+      hl.bind("SUPER + ALT + mouse_up", hl.dsp.group.prev(), { description = "Previous Window in Group" })
+      for index = 1, 9 do
+        hl.bind("SUPER + ALT + " .. index, hl.dsp.group.active({ index = index }),
+          { description = "Window " .. index .. " in Group" })
+      end
+
+      hl.config({
+        -- SUPER + H and L go through a group's windows before leaving it,
+        -- like the tabs of i3.
+        binds = { movefocus_cycles_groupfirst = true },
+        -- The tabs look like the bar: its font, and rounded pills. The
+        -- colours come with the theme (patch 0009).
+        group = {
+          groupbar = {
+            font_family = "JetBrainsMono Nerd Font",
+            font_size = 11,
+            font_weight_active = "bold",
+            height = 20,
+            gaps_in = 4,
+            gaps_out = 4,
+            gradients = true,
+            gradient_rounding = 5,
+            gradient_round_only_edges = false,
+            indicator_height = 0,
+          },
+        },
+      })
+    ''
+  );
+
   # The "Hyprsimple" login entry exactly as hyprsimple-session.sh writes it
   # (the package keeps a copy), with uwsm's full path, as in Hyprland's own
   # entries on NixOS. It is in the system profile too, so that
@@ -177,6 +246,28 @@ in
         does in ufw. NixOS's own firewall takes ufw's place.
       '';
     };
+
+    workspaces.names = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[^\n]+");
+      default = [ ];
+      example = [
+        "Web"
+        "Code"
+        "Term"
+      ];
+      description = ''
+        Names for workspaces 1, 2, 3 and so on, in that order. The bar shows
+        each name instead of the workspace's dot, and always shows these
+        workspaces, also while they are empty.
+      '';
+    };
+
+    groups.enable = lib.mkEnableOption ''
+      keys for window groups: windows stacked in one place with a tab for
+      each, the tabbed layout of i3. SUPER + G groups the window you are on,
+      SUPER + ALT + an arrow moves a window into the group there, and
+      SUPER + ALT + TAB goes to the next window in the group. The tabs follow
+      the theme'';
 
     loginEntry.enable = lib.mkEnableOption ''
       a "Hyprsimple" entry on the login screen, next to "Hyprland (UWSM)".
@@ -370,6 +461,8 @@ in
       "hyprsimple/arch-packages".text = lib.concatLines providedArchNames;
       "hyprsimple/arch-packages-excluded".text = lib.concatLines excludedArchNames;
       "hyprsimple/shims/pacman".source = "${cfg.package}/libexec/hyprsimple-nix/shims/pacman";
+      "hyprsimple/shims/systemctl".source = "${cfg.package}/libexec/hyprsimple-nix/shims/systemctl";
+      "hyprsimple/hyprland.lua".text = hyprlandLua;
       "hyprsimple/settings".text = ''
         HYPRSIMPLE_NIX_DEFAULT_THEME=${lib.escapeShellArg cfg.defaultTheme}
         HYPRSIMPLE_NIX_MUSLIMTIFY=${if cfg.muslimtify.enable then "1" else "0"}

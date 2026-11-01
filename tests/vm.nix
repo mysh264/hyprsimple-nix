@@ -21,6 +21,15 @@ pkgs.testers.runNixOSTest {
 
       programs.hyprsimple.enable = true;
       programs.hyprsimple.loginEntry.enable = true;
+      # Switched to partway through, the way a rebuild does it.
+      specialisation.extras.configuration = {
+        programs.hyprsimple.workspaces.names = [
+          "Web"
+          "Code"
+          "Term"
+        ];
+        programs.hyprsimple.groups.enable = true;
+      };
       # hyprsimple ships setup for these two shells as well; test them too.
       programs.zsh.enable = true;
       programs.fish.enable = true;
@@ -92,6 +101,9 @@ pkgs.testers.runNixOSTest {
           # No capability wrapper for Hyprland: it strips TZDIR from everything
           # the session starts, and time zones then read as UTC.
           machine.succeed("test ! -e /run/wrappers/bin/Hyprland")
+          machine.succeed("test -x /etc/hyprsimple/shims/systemctl")
+          # Nothing from programs.hyprsimple to add yet.
+          machine.succeed("! grep -q '^hl\\.' /etc/hyprsimple/hyprland.lua")
           # The "Hyprsimple" login entry, for login screens and for
           # `uwsm start hyprsimple.desktop`.
           sessions = "${
@@ -135,6 +147,15 @@ pkgs.testers.runNixOSTest {
           user("systemctl --user is-enabled hyprpaper.service hyprpolkitagent.service hyprsunset.service"
                " battery-monitor.timer hyprsimple-audio-autoswitch.service")
           user("test -L ~/.config/systemd/user/hyprsunset.service.d/10-hyprsimple.conf")
+          # The services NixOS ships run from /etc/systemd/user, which always
+          # holds the current system's, not from a link into /nix/store that
+          # would keep the version of install day (and break after a garbage
+          # collection: no wallpaper, no password prompts).
+          for unit in ("hyprpaper", "hyprpolkitagent", "hyprsunset"):
+              first = user(f"systemctl --user cat {unit}.service | head -n1")
+              assert first.startswith(f"# /etc/systemd/user/{unit}.service"), first
+          user("test -z \"$(find ~/.config/systemd/user -maxdepth 2 -type l -lname '/nix/store/*')\"")
+          user("systemctl --user is-enabled hyprpaper.service hyprpolkitagent.service hyprsunset.service")
           # hyprsimple's script for the login entry points to the NixOS setting.
           out = user("~/.local/bin/hyprsimple-session.sh")
           assert "programs.hyprsimple.loginEntry.enable = true;" in out, out
@@ -310,11 +331,80 @@ pkgs.testers.runNixOSTest {
           missing_modules = re.findall(r'module "[^"]+" is not installed', journal)
           assert not missing_modules, missing_modules
 
+      with subtest("workspace names and window groups, turned on by a rebuild"):
+          machine.succeed("${nodes.machine.system.build.toplevel}/specialisation/extras/bin/switch-to-configuration test")
+          user("hyprctl reload")
+          machine.wait_until_succeeds(
+              "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 workspacerules -j' | grep -q '\"defaultName\": \"Term\"'",
+              timeout=30,
+          )
+          errors = user("hyprctl configerrors 2>&1")
+          assert errors.strip() in ("", "no errors"), errors
+          binds = user("hyprctl binds -j")
+          for key in ("Group Windows / Ungroup", "Take Window out of Group", "Move Window into Group Left",
+                      "Next Window in Group", "Window 1 in Group"):
+              assert key in binds, f"no key for: {key}"
+          machine.sleep(3)
+          machine.screenshot("workspace-names")
+
+          def wait_for(jq, expected):
+              machine.wait_until_succeeds(
+                  "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 clients -j'"
+                  " | jq -e '[.[] | select(.workspace.id == 6 and .class == \"com.mitchellh.ghostty\")] | " + jq + " == " + str(expected) + "'",
+                  timeout=60,
+              )
+          def terminal():
+              user("setsid -f uwsm app -- ghostty >/dev/null 2>&1 </dev/null")
+
+          # Three terminals as one group, on an empty workspace.
+          machine.send_key("meta_l-6")
+          terminal()
+          wait_for("length", 1)
+          machine.send_key("meta_l-g")
+          wait_for("map(.grouped | length) | max", 1)
+          terminal()
+          wait_for("length", 2)
+          terminal()
+          wait_for("length", 3)
+          wait_for("map(.grouped | length) | min", 3)
+          machine.sleep(2)
+          machine.screenshot("window-group")
+
+          # Out of the group and back in.
+          machine.send_key("meta_l-alt-g")
+          wait_for("map(.grouped | length) | sort", [0, 2, 2])
+          machine.send_key("meta_l-alt-left")
+          wait_for("map(.grouped | length) | min", 3)
+
+          # Closing the first window, then any other, closes only that one.
+          machine.send_key("meta_l-alt-1")
+          first = user("hyprctl activewindow -j | jq -r .address").strip()
+          machine.send_key("meta_l-q")
+          wait_for("length", 2)
+          assert first not in user("hyprctl clients -j"), "the first window is still there"
+          wait_for("map(.grouped | length) | min", 2)
+          machine.send_key("meta_l-alt-tab")
+          machine.send_key("meta_l-q")
+          wait_for("length", 1)
+          machine.send_key("meta_l-q")
+          wait_for("length", 0)
+          machine.send_key("meta_l-1")
+
       with subtest("hyprsimple-update with nothing new"):
+          # An install from before the fix: hyprpaper's unit linked from
+          # /nix/store, as `systemctl --user enable` leaves it. The update
+          # points it back at the system's.
+          user("ln -sfn \"$(readlink -f /etc/systemd/user/hyprpaper.service)\" ~/.config/systemd/user/hyprpaper.service"
+               " && ln -sfn \"$(readlink -f /etc/systemd/user/hyprpaper.service)\" ~/.config/systemd/user/graphical-session.target.wants/hyprpaper.service"
+               " && systemctl --user daemon-reload")
           out = user("hyprsimple-update 2>&1")
           print(out)
           assert "already what your NixOS configuration provides" in out
           assert "hyprsimple is up to date" in out
+          assert "Now from your current system: hyprpaper.service" in out, "the pinned unit was not repaired"
+          user("test -z \"$(find ~/.config/systemd/user -maxdepth 2 -type l -lname '/nix/store/*')\"")
+          assert user("systemctl --user cat hyprpaper.service | head -n1").startswith("# /etc/systemd/user/hyprpaper.service")
+          user("systemctl --user is-enabled hyprpaper.service")
 
       with subtest("hyprsimple-update after an upgrade brings a new version"):
           # Stand in for a rebuild that brings a new hyprsimple: a copy of the
