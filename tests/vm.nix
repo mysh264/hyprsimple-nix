@@ -452,7 +452,12 @@ pkgs.testers.runNixOSTest {
           )
 
       with subtest("the Hyprsimple login entry starts the same desktop"):
-          user("uwsm stop")
+          # Retried: when a timer (battery-monitor) queues a start at that very
+          # moment, systemd refuses the stop as "destructive" and uwsm gives up.
+          machine.wait_until_succeeds(
+              "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 uwsm stop'",
+              timeout=60,
+          )
           machine.wait_until_fails("pgrep -u alice -f 'Hyprland --watchdog-fd'", timeout=60)
           machine.succeed("rm -rf /run/user/1000/hypr")
           machine.wait_until_succeeds("pgrep -t tty1 -u alice bash", timeout=60)
