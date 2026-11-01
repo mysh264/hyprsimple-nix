@@ -1,0 +1,27 @@
+diff --git a/.local/bin/hyprsimple-debug.sh b/.local/bin/hyprsimple-debug.sh
+index 5b815eb..6f609f2 100755
+--- a/.local/bin/hyprsimple-debug.sh
++++ b/.local/bin/hyprsimple-debug.sh
+@@ -152,6 +152,7 @@ hyprsimple_version() {
+   else
+     echo "(Hyprland not running, or hyprctl unavailable)"
+     pacman -Qi hyprland 2>/dev/null | grep -E '^(Name|Version)' || true
++    Hyprland --version 2>/dev/null | head -1 || true
+   fi
+ 
+   section "SERVICES"
+@@ -230,6 +231,14 @@ hyprsimple_version() {
+     echo "(no install log at $INSTALL_LOG)"
+   fi
+ 
++  if [[ -e /etc/hyprsimple/source ]]; then
++    section "NIXOS"
++    echo "NixOS:     $(nixos-version 2>/dev/null || echo unknown)"
++    echo "Source:    $(readlink -f /etc/hyprsimple/source 2>/dev/null || echo unknown)"
++    echo "Provides:  $(wc -l </etc/hyprsimple/arch-packages 2>/dev/null || echo 0) of the Arch packages hyprsimple lists"
++    hyprsimple-nixos check-packages 2>&1 || true
++  fi
++
+   section "EXPLICITLY INSTALLED PACKAGES"
+   if command -v expac >/dev/null 2>&1; then
+     # shellcheck disable=SC2046  # splitting is wanted: one argument per package

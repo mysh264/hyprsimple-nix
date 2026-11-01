@@ -1,0 +1,28 @@
+diff --git a/src/platform/linux/daemon.c b/src/platform/linux/daemon.c
+index 2e93fe5..481ff93 100644
+--- a/src/platform/linux/daemon.c
++++ b/src/platform/linux/daemon.c
+@@ -193,8 +193,22 @@ static const char *resolve_daemon_binary(const char *binary_path, char *sibling,
+   // Beside the running program first: that is the command line tool itself, a
+   // frontend installed next to it, or a build run from its build directory.
+   // Then where this build installs to, then the usual system locations.
+-  const char *candidates[4];
++  //
++  // NixOS: the running program lives in /nix/store under a path that changes
++  // on every update and disappears on garbage collection, so a unit written
++  // with it stops working after an upgrade. The profile paths are stable
++  // symlinks to whichever build is current, so they are tried first.
++  const char *candidates[7];
+   size_t count = 0;
++  static char nixos_user_profile[PLATFORM_DAEMON_PATH_MAX];
++  const char *nixos_user = getenv("USER");
++  candidates[count++] = "/run/current-system/sw/bin/muslimtify";
++  if (nixos_user && nixos_user[0] != '\0') {
++    int n = snprintf(nixos_user_profile, sizeof(nixos_user_profile),
++                     "/etc/profiles/per-user/%s/bin/muslimtify", nixos_user);
++    if (n > 0 && (size_t)n < sizeof(nixos_user_profile))
++      candidates[count++] = nixos_user_profile;
++  }
+   const char *dir = platform_exe_dir();
+   if (dir && dir[0] != '\0') {
+     int n = snprintf(sibling, cap, "%s/muslimtify", dir);

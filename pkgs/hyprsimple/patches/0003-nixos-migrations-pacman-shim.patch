@@ -1,0 +1,18 @@
+diff --git a/.local/bin/hyprsimple-migrate.sh b/.local/bin/hyprsimple-migrate.sh
+index 466ee41..8d0f2a8 100755
+--- a/.local/bin/hyprsimple-migrate.sh
++++ b/.local/bin/hyprsimple-migrate.sh
+@@ -10,6 +10,13 @@
+ 
+ export HYPRSIMPLE_PATH="${HYPRSIMPLE_PATH:-$HOME/.local/share/hyprsimple}"
+ 
++# hyprsimple-nix: migrations written for Arch ask pacman whether a package is
++# installed. On NixOS a stand-in answers from the NixOS configuration, and
++# explains, rather than installs, when a migration asks for a package.
++if [[ -d /etc/hyprsimple/shims ]]; then
++  export PATH="/etc/hyprsimple/shims:$PATH"
++fi
++
+ STATE_DIR="$HOME/.local/state/hyprsimple/migrations"
+ mkdir -p "$STATE_DIR/skipped"
+ 

@@ -1,0 +1,81 @@
+name: Upstream release
+
+# Once a week, look for a new hyprsimple release. When there is one, pin it,
+# check that the NixOS patches still apply and every package it lists is
+# mapped, and open a pull request with the result.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Find the newest release
+        id: find
+        run: |
+          current=$(nix eval --raw .#hyprsimple.version)
+          latest=$(git ls-remote --tags https://github.com/rizukirr/hyprsimple.git |
+            sed 's|.*refs/tags/||; s|\^{}$||' | grep -E '^v[0-9]' | sort -uV | tail -1)
+          latest=${latest#v}
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)" != "$current" ]; then
+            echo "newer=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pin it
+        if: steps.find.outputs.newer == 'true'
+        run: |
+          latest=${{ steps.find.outputs.latest }}
+          hash=$(nix flake prefetch --json "github:rizukirr/hyprsimple/v$latest" | jq -r .hash)
+          sed -i \
+            -e "s|version = \"${{ steps.find.outputs.current }}\";|version = \"$latest\";|" \
+            -e "/repo = \"hyprsimple\";/,/hash = /s|hash = \"sha256-[^\"]*\";|hash = \"$hash\";|" \
+            pkgs/hyprsimple/package.nix
+          git diff
+
+      - name: Check it
+        if: steps.find.outputs.newer == 'true'
+        id: check
+        continue-on-error: true
+        run: |
+          {
+            echo 'report<<EOF'
+            for check in hyprsimple package-mapping scripts; do
+              if nix build -L ".#checks.x86_64-linux.$check" 2>build.log; then
+                echo "- [x] \`$check\`"
+              else
+                echo "- [ ] \`$check\` failed:"
+                echo '```'
+                tail -n 30 build.log
+                echo '```'
+              fi
+            done
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@v7
+        if: steps.find.outputs.newer == 'true'
+        with:
+          branch: upstream/hyprsimple-${{ steps.find.outputs.latest }}
+          commit-message: "hyprsimple: ${{ steps.find.outputs.current }} -> ${{ steps.find.outputs.latest }}"
+          title: "hyprsimple: ${{ steps.find.outputs.current }} -> ${{ steps.find.outputs.latest }}"
+          body: |
+            hyprsimple [v${{ steps.find.outputs.latest }}](https://github.com/rizukirr/hyprsimple/releases/tag/v${{ steps.find.outputs.latest }}) is out. ([changes](https://github.com/rizukirr/hyprsimple/compare/v${{ steps.find.outputs.current }}...v${{ steps.find.outputs.latest }}))
+
+            ${{ steps.check.outputs.report }}
+
+            Before merging:
+            - [ ] Read the diff of `install.sh` for new per-user steps, and mirror them in `pkgs/hyprsimple/hyprsimple-nixos.sh`.
+            - [ ] Map any new package in `modules/arch-packages.nix`.
+            - [ ] Run the VM test: `nix build -L .#checks.x86_64-linux.vm` (or run CI on this branch).

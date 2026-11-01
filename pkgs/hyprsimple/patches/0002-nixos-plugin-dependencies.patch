@@ -1,0 +1,27 @@
+diff --git a/.local/bin/hyprsimple-plugin b/.local/bin/hyprsimple-plugin
+index 9c1cd5d..264fa94 100755
+--- a/.local/bin/hyprsimple-plugin
++++ b/.local/bin/hyprsimple-plugin
+@@ -107,6 +107,22 @@ lifecycle() {
+ dependencies() {
+   local dir=$1 kind pkg helper
+   local -a missing flags
++  # hyprsimple-nix: on NixOS a plugin's packages come from the NixOS
++  # configuration. pacman and AUR helpers do not exist there, so check that
++  # each one is provided, by name or by a command of the same name, and say
++  # how to add it when it is not.
++  if [[ -e /etc/hyprsimple/source ]]; then
++    missing=()
++    while IFS= read -r pkg; do
++      grep -qxF -- "$pkg" /etc/hyprsimple/arch-packages 2>/dev/null && continue
++      command -v -- "$pkg" >/dev/null 2>&1 && continue
++      missing+=("$pkg")
++    done < <(jq -r '.dependencies // {} | (.packages // []) + (.aur // []) | .[]' "$dir/manifest.json")
++    ((${#missing[@]})) || return 0
++    printf 'hyprsimple-plugin: this plugin needs %s, which your NixOS configuration does not provide.\n' "${missing[*]}" >&2
++    printf 'hyprsimple-plugin: add it to environment.systemPackages, rebuild, and run this again.\n' >&2
++    return 1
++  fi
+   for kind in packages aur; do
+     missing=()
+     while IFS= read -r pkg; do
