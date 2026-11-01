@@ -29,6 +29,11 @@ pkgs.testers.runNixOSTest {
           "Term"
         ];
         programs.hyprsimple.groups.enable = true;
+        programs.hyprsimple.i3 = {
+          enable = true;
+          workspaces = [ 2 ];
+        };
+        programs.hyprsimple.bar.position = "bottom";
       };
       # hyprsimple ships setup for these two shells as well; test them too.
       programs.zsh.enable = true;
@@ -60,8 +65,10 @@ pkgs.testers.runNixOSTest {
   testScript =
     { nodes, ... }:
     ''
+      import json
       import re
       import shlex
+      import time
 
       def user(cmd, check=True):
           env = "export XDG_RUNTIME_DIR=/run/user/1000; "
@@ -362,10 +369,11 @@ pkgs.testers.runNixOSTest {
           machine.sleep(3)
           machine.screenshot("workspace-names")
 
-          def wait_for(jq, expected):
+          def wait_for(jq, expected, workspace=6):
               machine.wait_until_succeeds(
                   "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 clients -j'"
-                  " | jq -e '[.[] | select(.workspace.id == 6 and .class == \"com.mitchellh.ghostty\")] | " + jq + " == " + str(expected) + "'",
+                  f" | jq -e '[.[] | select(.workspace.id == {workspace} and .class == \"com.mitchellh.ghostty\")] | "
+                  + jq + " == " + str(expected) + "'",
                   timeout=60,
               )
           def terminal():
@@ -404,6 +412,107 @@ pkgs.testers.runNixOSTest {
           machine.send_key("meta_l-q")
           wait_for("length", 0)
           machine.send_key("meta_l-1")
+
+      with subtest("the i3 layout: tabs, splits, and the key that switches a workspace"):
+          machine.wait_until_succeeds("su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 plugin list' | grep -q hy3", timeout=30)
+          errors = user("hyprctl configerrors 2>&1")
+          assert errors.strip() in ("", "no errors"), errors
+          binds = user("hyprctl binds -j")
+          for key in ("Switch This Workspace: Hyprland / i3 Layout", "i3 Layout: Next Window Beside",
+                      "i3 Layout: Turn the Split", "Tabs / Split", "Next Tab", "Tab 1"):
+              assert key in binds, f"no key for: {key}"
+
+          def placed(workspace):
+              return sorted(
+                  (tuple(c["at"]), tuple(c["size"]))
+                  for c in json.loads(user("hyprctl clients -j"))
+                  if c["workspace"]["id"] == workspace and c["class"] == "com.mitchellh.ghostty"
+              )
+          def eventually(check, what, timeout=30):
+              end = time.time() + timeout
+              while not check():
+                  if time.time() > end:
+                      raise AssertionError(what)
+                  time.sleep(0.5)
+          # The whole screen, but the bar.
+          monitor = json.loads(user("hyprctl monitors -j"))[0]
+          left, top, right, bottom = monitor["reserved"]
+          screen = ((monitor["x"] + left, monitor["y"] + top),
+                    (monitor["width"] - left - right, monitor["height"] - top - bottom))
+          print("whole screen:", screen)
+
+          # Workspace 2 starts in the i3 layout. One window: no tab bar, no
+          # gaps, no border, the whole screen.
+          machine.send_key("meta_l-2")
+          terminal()
+          wait_for("length", 1, workspace=2)
+          eventually(lambda: placed(2) == [screen], f"one window is not the whole screen: {placed(2)}")
+          # A second window makes tabs: both in the same place, under the tab bar.
+          terminal()
+          wait_for("length", 2, workspace=2)
+          eventually(lambda: len(set(placed(2))) == 1 and placed(2)[0][0][1] > screen[0][1],
+                     f"two windows did not become tabs: {placed(2)}")
+          machine.sleep(2)
+          machine.screenshot("i3-tabs")
+          # SUPER + G splits them side by side, and makes tabs again.
+          machine.send_key("meta_l-g")
+          eventually(lambda: len({p[0][0] for p in placed(2)}) == 2, f"the tabs did not split: {placed(2)}")
+          machine.sleep(1)
+          machine.screenshot("i3-split")
+          machine.send_key("meta_l-g")
+          eventually(lambda: len(set(placed(2))) == 1, f"the split did not become tabs again: {placed(2)}")
+          # Closing one leaves the other, as the whole screen again.
+          machine.send_key("meta_l-q")
+          wait_for("length", 1, workspace=2)
+          eventually(lambda: placed(2) == [screen], f"the last window does not fill the screen: {placed(2)}")
+          # SUPER + CTRL + SPACE: Hyprland's layout, with its gaps, and back.
+          machine.send_key("meta_l-ctrl-spc")
+          eventually(lambda: placed(2)[0][0][0] > screen[0][0], f"no switch to Hyprland's layout: {placed(2)}")
+          machine.send_key("meta_l-ctrl-spc")
+          eventually(lambda: placed(2) == [screen], f"no switch back to the i3 layout: {placed(2)}")
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=2)
+
+          # Workspace 7 starts in Hyprland's layout. Switched, it keeps the i3
+          # layout when Hyprland reloads its configuration.
+          machine.send_key("meta_l-7")
+          machine.send_key("meta_l-ctrl-spc")
+          user("hyprctl reload")
+          machine.sleep(3)
+          terminal()
+          wait_for("length", 1, workspace=7)
+          terminal()
+          wait_for("length", 2, workspace=7)
+          eventually(lambda: len(set(placed(7))) == 1, f"workspace 7 lost the i3 layout on reload: {placed(7)}")
+          machine.send_key("meta_l-q")
+          wait_for("length", 1, workspace=7)
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=7)
+          machine.send_key("meta_l-1")
+
+      with subtest("the bar at the bottom, with its panels and notifications opening upwards"):
+          machine.succeed("grep -q HYPRSIMPLE_BAR /etc/pam/environment")
+          # The setting reaches a new session. This one gets the bar restarted
+          # with it, as a new login would start it.
+          print(user("systemd-run --user --wait --collect --pipe --quiet -p KillMode=process"
+                     " sh -c 'HYPRSIMPLE_BAR=bottom ~/.local/bin/hyprsimple-restart-bar.sh' 2>&1"))
+          def bar_layer():
+              for monitor in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor["levels"].values():
+                      for layer in layers:
+                          if layer["namespace"] == "quickshell":
+                              return layer
+          monitor = json.loads(user("hyprctl monitors -j"))[0]
+          eventually(lambda: (bar_layer() or {}).get("y", 0) > 0 and bar_layer()["y"] + bar_layer()["h"] == monitor["height"],
+                     f"the bar is not at the bottom: {bar_layer()}")
+          panel = "qs -p ~/.local/share/hyprsimple/default/quickshell ipc call bar toggle "
+          in_session(panel + "calendar")
+          machine.sleep(2)
+          machine.screenshot("bar-bottom-panel")
+          in_session(panel + "calendar")
+          in_session("notify-send 'hyprsimple-nix' 'The bar is at the bottom'")
+          machine.sleep(2)
+          machine.screenshot("bar-bottom-notification")
 
       with subtest("hyprsimple-update with nothing new"):
           # An install from before the fix: hyprpaper's unit linked from

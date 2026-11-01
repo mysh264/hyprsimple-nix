@@ -1,0 +1,170 @@
+diff --git a/default/quickshell/bar/Bar.qml b/default/quickshell/bar/Bar.qml
+index f522ada..ef82c8b 100644
+--- a/default/quickshell/bar/Bar.qml
++++ b/default/quickshell/bar/Bar.qml
+@@ -31,7 +31,7 @@ PanelWindow {
+     }
+ 
+     screen: modelData
+-    anchors { top: true; left: true; right: true }
++    anchors { top: !Theme.barAtBottom; bottom: Theme.barAtBottom; left: true; right: true }
+     exclusionMode: ExclusionMode.Auto
+     implicitHeight: Theme.barHeight
+     color: Theme.bg
+diff --git a/default/quickshell/bar/Tooltip.qml b/default/quickshell/bar/Tooltip.qml
+index de25e28..0252843 100644
+--- a/default/quickshell/bar/Tooltip.qml
++++ b/default/quickshell/bar/Tooltip.qml
+@@ -27,8 +27,8 @@ PopupWindow {
+     }
+ 
+     anchor.item: target
+-    anchor.edges: Edges.Bottom
+-    anchor.gravity: Edges.Bottom
++    anchor.edges: Theme.barAtBottom ? Edges.Top : Edges.Bottom
++    anchor.gravity: Theme.barAtBottom ? Edges.Top : Edges.Bottom
+     visible: ready && hovered && text !== ""
+     implicitWidth: label.implicitWidth + 2 * Theme.sm
+     // The space above the label clears the bar's bottom edge.
+@@ -36,7 +36,11 @@ PopupWindow {
+     color: "transparent"
+ 
+     Rectangle {
+-        anchors { fill: parent; topMargin: Theme.tooltipGap }
++        anchors {
++            fill: parent
++            topMargin: Theme.barAtBottom ? 0 : Theme.tooltipGap
++            bottomMargin: Theme.barAtBottom ? Theme.tooltipGap : 0
++        }
+         radius: Theme.capsuleRadius
+         color: Theme.surface
+         border.width: 1
+diff --git a/default/quickshell/notifications/NotificationPopups.qml b/default/quickshell/notifications/NotificationPopups.qml
+index ea60302..c0be677 100644
+--- a/default/quickshell/notifications/NotificationPopups.qml
++++ b/default/quickshell/notifications/NotificationPopups.qml
+@@ -35,6 +35,7 @@ PanelWindow {
+         readonly property real corner: Math.min(Theme.panelRadius, height / 2)
+ 
+         x: root.flare
++        y: Theme.barAtBottom ? parent.height - height : 0
+         width: parent.width - root.flare
+         // Each notification grows and shrinks its own slot, and the card follows.
+         height: stack.height > 0 ? stack.height + 2 * root.pad - Theme.sm : 0
+@@ -45,6 +46,8 @@ PanelWindow {
+             x: -root.flare
+             width: card.width + root.flare
+             height: card.height
++            // Upside down over a bottom bar: the flare joins it there.
++            transform: Scale { origin.y: card.height / 2; yScale: Theme.barAtBottom ? -1 : 1 }
+             preferredRendererType: Shape.CurveRenderer
+ 
+             ShapePath {
+@@ -81,7 +84,7 @@ PanelWindow {
+             Column {
+                 id: stack
+                 x: root.pad
+-                y: root.pad
++                y: Theme.barAtBottom ? parent.height - height - root.pad + Theme.sm : root.pad
+                 width: Theme.notifyWidth
+ 
+                 Repeater {
+diff --git a/default/quickshell/notifications/NotificationSidebar.qml b/default/quickshell/notifications/NotificationSidebar.qml
+index 9d2c3a8..409ac6a 100644
+--- a/default/quickshell/notifications/NotificationSidebar.qml
++++ b/default/quickshell/notifications/NotificationSidebar.qml
+@@ -87,7 +87,8 @@ PanelWindow {
+     screen: bar.screen
+     visible: open || closing.running
+     anchors { top: true; bottom: true; left: true; right: true }
+-    margins.top: Theme.barHeight
++    margins.top: Theme.barAtBottom ? 0 : Theme.barHeight
++    margins.bottom: Theme.barAtBottom ? Theme.barHeight : 0
+     exclusionMode: ExclusionMode.Ignore
+     color: "transparent"
+     mask: open ? null : noInput
+diff --git a/default/quickshell/panels/LauncherPanel.qml b/default/quickshell/panels/LauncherPanel.qml
+index b9f0987..66e95e4 100644
+--- a/default/quickshell/panels/LauncherPanel.qml
++++ b/default/quickshell/panels/LauncherPanel.qml
+@@ -90,7 +90,8 @@ PanelWindow {
+     screen: bar.screen
+     visible: open || closing.running
+     anchors { top: true; bottom: true; left: true; right: true }
+-    margins.top: Theme.barHeight
++    margins.top: Theme.barAtBottom ? 0 : Theme.barHeight
++    margins.bottom: Theme.barAtBottom ? Theme.barHeight : 0
+     exclusionMode: ExclusionMode.Ignore
+     color: "transparent"
+     // No input while closing, so what is underneath can be clicked at once.
+diff --git a/default/quickshell/panels/OtherScreenCatcher.qml b/default/quickshell/panels/OtherScreenCatcher.qml
+index a77d43d..0f2216a 100644
+--- a/default/quickshell/panels/OtherScreenCatcher.qml
++++ b/default/quickshell/panels/OtherScreenCatcher.qml
+@@ -15,7 +15,8 @@ PanelWindow {
+     screen: bar.screen
+     visible: owner !== null && owner !== bar
+     anchors { top: true; bottom: true; left: true; right: true }
+-    margins.top: Theme.barHeight
++    margins.top: Theme.barAtBottom ? 0 : Theme.barHeight
++    margins.bottom: Theme.barAtBottom ? Theme.barHeight : 0
+     exclusionMode: ExclusionMode.Ignore
+     color: "transparent"
+     WlrLayershell.layer: WlrLayer.Overlay
+diff --git a/default/quickshell/panels/PopupPanel.qml b/default/quickshell/panels/PopupPanel.qml
+index fc4f5a9..4e110fa 100644
+--- a/default/quickshell/panels/PopupPanel.qml
++++ b/default/quickshell/panels/PopupPanel.qml
+@@ -95,7 +95,8 @@ PanelWindow {
+     screen: bar.screen
+     visible: open || closing.running
+     anchors { top: true; bottom: true; left: true; right: true }
+-    margins.top: Theme.barHeight
++    margins.top: Theme.barAtBottom ? 0 : Theme.barHeight
++    margins.bottom: Theme.barAtBottom ? Theme.barHeight : 0
+     exclusionMode: ExclusionMode.Ignore
+     color: "transparent"
+     // No input while closing, so what is underneath can be clicked at once.
+@@ -125,6 +126,7 @@ PanelWindow {
+         readonly property real corner: Math.min(Theme.panelRadius, height / 2)
+ 
+         x: panel.leftEdge
++        y: Theme.barAtBottom ? panel.height - height : 0
+         width: panel.panelWidth
+         height: Math.max(0, fullHeight * panel.progress)
+         focus: true
+@@ -136,6 +138,8 @@ PanelWindow {
+             x: -card.flare
+             width: card.width + 2 * card.flare
+             height: card.height
++            // Upside down under a bottom bar: the flares join it there.
++            transform: Scale { origin.y: card.height / 2; yScale: Theme.barAtBottom ? -1 : 1 }
+             preferredRendererType: Shape.CurveRenderer
+ 
+             ShapePath {
+@@ -192,7 +196,8 @@ PanelWindow {
+             Column {
+                 id: box
+                 x: Theme.lg
+-                y: Theme.lg
++                // Next to the bar while the card grows, so it is revealed from there.
++                y: Theme.barAtBottom ? parent.height - height - Theme.lg : Theme.lg
+                 width: parent.width - 2 * Theme.lg
+                 spacing: Theme.sm
+                 opacity: Math.max(0, Math.min(1, panel.progress))
+diff --git a/default/quickshell/theme/Theme.qml b/default/quickshell/theme/Theme.qml
+index b54db6f..60101d8 100644
+--- a/default/quickshell/theme/Theme.qml
++++ b/default/quickshell/theme/Theme.qml
+@@ -21,6 +21,11 @@ Singleton {
+     readonly property color secondary: colors.secondary ?? "#bb9af7"
+     // Content drawn on top of the accent.
+     readonly property color onAccent: bg
++
++    // hyprsimple-nix: the bar at the bottom of the screen instead of the top,
++    // from programs.hyprsimple.bar.position. The panels, notifications and
++    // tooltips then open upwards out of it.
++    readonly property bool barAtBottom: Quickshell.env("HYPRSIMPLE_BAR") === "bottom"
+     readonly property color danger: colors.danger ?? "#f7768e"
+ 
+     FileView {

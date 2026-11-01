@@ -102,8 +102,9 @@ Good to know:
 ```
 
 A group is several windows stacked in one place, like the tabs in a web
-browser: you see one window, and a bar of tabs above it shows the others. It
-is the "tabbed" layout of i3. hyprsimple has no keys for groups; this line
+browser: you see one window, and a bar of tabs above it shows the others.
+These are Hyprland's own groups; for the real i3 layout, with tabs *and*
+splits, see the next section. hyprsimple has no keys for groups; this line
 adds them. The tabs take the colours of your theme.
 
 1. Add the line to `configuration.nix`, and rebuild.
@@ -134,6 +135,67 @@ group. Our tests check exactly that.
 > close the terminal. To keep it open, start it from the app menu, or start
 > it like this: `setsid -f nautilus` (with your program instead of
 > `nautilus`).
+
+### The i3 layout (tabs and splits, like i3)
+
+```nix
+  programs.hyprsimple.i3 = {
+    enable = true;
+    workspaces = [ 2 3 ];
+  };
+```
+
+Hyprland arranges your windows by itself: each new window takes half of the
+space. i3 lets you choose: windows in tabs, side by side, or on top of each
+other. With this setting you get both, workspace by workspace. It uses
+[hy3](https://github.com/outfoxxed/hy3), the plugin that brings i3's layout
+to Hyprland.
+
+1. Add the lines to `configuration.nix`. `workspaces` lists the workspaces
+   that start in the i3 layout (here 2 and 3). The others start in
+   Hyprland's.
+2. Rebuild, then log out and back in.
+3. Press **SUPER + /** to see the new keys among the others.
+
+**SUPER + CTRL + SPACE** switches the workspace you are on between the two
+layouts, at any time. The switch stays until you log out.
+
+On a workspace in the i3 layout:
+
+- **One window** fills the whole screen: no tab bar, no gaps, no border.
+- **A second window** turns them into tabs, with a tab bar on top, like i3
+  with tabs as its default.
+- **Back to one window**, the tab bar goes away again.
+
+| Press | What happens on an i3 workspace |
+|---|---|
+| **SUPER + G** | Tabs become side by side, and back again. |
+| **SUPER + ALT + TAB** | Next tab. Add **SHIFT** for the one before. The mouse wheel works too, with **SUPER + ALT**. |
+| **SUPER + ALT + 1** … **9** | Tab 1 … 9. |
+| **SUPER + H** / **J** / **K** / **L** | Go to the window or tab on that side. |
+| **SUPER + ALT + ←** (or →, ↑, ↓, or **H**, **L**, **K**, **J**) | Move the window you are on that way: next to another one, or into its tabs. |
+| **SUPER + CTRL + H** | The next window you open goes **beside** this one. |
+| **SUPER + CTRL + J** | The next window you open goes **below** this one. |
+| **SUPER + CTRL + E** | Turn the split: side by side becomes on top of each other, and back. |
+| **SUPER + Q** | Closes the window you are on, and only that one. |
+
+Have both this and window groups on? The same keys (**SUPER + G**,
+**SUPER + ALT + ...**) work Hyprland's groups on a Hyprland workspace, and
+i3's tabs on an i3 workspace. **SUPER + /** says both.
+
+### The bar at the bottom
+
+```nix
+  programs.hyprsimple.bar.position = "bottom";
+```
+
+1. Add the line to `configuration.nix`, and rebuild.
+2. Log out and back in.
+
+The bar now sits at the bottom of the screen. Its panels (calendar, sound,
+Wi-Fi and the others), the notifications and the little hints all open
+upwards out of it. To put it back at the top, write `"top"` instead, or take
+the line out, rebuild, and log out and in.
 
 ### Prayer times on the bar
 

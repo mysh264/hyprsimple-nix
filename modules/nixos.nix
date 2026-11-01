@@ -79,74 +79,59 @@ let
     wget
   ];
 
-  # A Lua string, for the names put into Hyprland's configuration below.
+  # A Lua string and a Lua list, for the settings written into Lua below.
   luaString = text: "\"" + lib.escape [ "\\" "\"" ] text + "\"";
+  luaList = toLua: items: "{ " + lib.concatMapStringsSep ", " toLua items + " }";
 
-  # What programs.hyprsimple adds to Hyprland's configuration. hyprsimple's
-  # own defaults load it (patch 0007), before the user's files in ~/.config.
-  hyprlandLua = lib.concatStringsSep "\n" (
-    [
-      ''
-        -- Written by hyprsimple-nix from programs.hyprsimple in your NixOS
-        -- configuration. Change the settings there and rebuild: this file is
-        -- replaced every time.
-      ''
-    ]
-    ++ lib.optional (cfg.workspaces.names != [ ]) (
-      ''
-        -- Workspace names (programs.hyprsimple.workspaces.names). The bar
-        -- shows them, and always shows these workspaces.
-      ''
-      + lib.concatImapStrings (
-        number: name:
-        "hl.workspace_rule({ workspace = \"${toString number}\", default_name = ${luaString name} })\n"
-      ) cfg.workspaces.names
-    )
-    ++ lib.optional cfg.groups.enable ''
-      -- Window groups (programs.hyprsimple.groups.enable): windows stacked in
-      -- one place, with a tab for each. SUPER + Q still closes only the window
-      -- you are on; the rest of its group stays.
-      hl.bind("SUPER + G", hl.dsp.group.toggle(), { description = "Group Windows / Ungroup" })
-      hl.bind("SUPER + ALT + G", hl.dsp.window.move({ out_of_group = true }), { description = "Take Window out of Group" })
-      for _, way in ipairs({
-        { "LEFT", "l", "Left" }, { "RIGHT", "r", "Right" }, { "UP", "u", "Up" }, { "DOWN", "d", "Down" },
-        { "H", "l", "Left" }, { "L", "r", "Right" }, { "K", "u", "Up" }, { "J", "d", "Down" },
-      }) do
-        hl.bind("SUPER + ALT + " .. way[1], hl.dsp.window.move({ into_group = way[2] }),
-          { description = "Move Window into Group " .. way[3] })
-      end
-      hl.bind("SUPER + ALT + TAB", hl.dsp.group.next(), { description = "Next Window in Group" })
-      hl.bind("SUPER + ALT + SHIFT + TAB", hl.dsp.group.prev(), { description = "Previous Window in Group" })
-      hl.bind("SUPER + ALT + mouse_down", hl.dsp.group.next(), { description = "Next Window in Group" })
-      hl.bind("SUPER + ALT + mouse_up", hl.dsp.group.prev(), { description = "Previous Window in Group" })
-      for index = 1, 9 do
-        hl.bind("SUPER + ALT + " .. index, hl.dsp.group.active({ index = index }),
-          { description = "Window " .. index .. " in Group" })
-      end
+  # What programs.hyprsimple adds to Hyprland's configuration: the settings,
+  # then the code in hyprland.lua that acts on them. hyprsimple's own config
+  # loads it (patch 0007), before the user's files in ~/.config.
+  extrasOn = cfg.workspaces.names != [ ] || cfg.groups.enable || cfg.i3.enable;
+  hyprlandLua = ''
+    -- Written by hyprsimple-nix from programs.hyprsimple in your NixOS
+    -- configuration. Change the settings there and rebuild: this file is
+    -- replaced every time.
+  ''
+  + lib.optionalString extrasOn ''
+    local nix = {
+      names = ${luaList luaString cfg.workspaces.names},
+      groups = ${lib.boolToString cfg.groups.enable},
+      i3 = ${lib.boolToString cfg.i3.enable},
+      i3_workspaces = ${luaList toString cfg.i3.workspaces},
+      hy3 = ${luaString (lib.optionalString cfg.i3.enable "${cfg.i3.package}/lib/libhy3.so")},
+    }
 
-      hl.config({
-        -- SUPER + H and L go through a group's windows before leaving it,
-        -- like the tabs of i3.
-        binds = { movefocus_cycles_groupfirst = true },
-        -- The tabs look like the bar: its font, and rounded pills. The
-        -- colours come with the theme (patch 0009).
-        group = {
-          groupbar = {
-            font_family = "JetBrainsMono Nerd Font",
-            font_size = 11,
-            font_weight_active = "bold",
-            height = 20,
-            gaps_in = 4,
-            gaps_out = 4,
-            gradients = true,
-            gradient_rounding = 5,
-            gradient_round_only_edges = false,
-            indicator_height = 0,
-          },
-        },
-      })
-    ''
-  );
+    ${builtins.readFile ./hyprland.lua}'';
+
+  # hy3, the plugin behind the i3 layout, built for this system's Hyprland. A
+  # plugin only loads into the Hyprland version it was built for, and nixpkgs'
+  # hy3 is sometimes a version behind. hy3 tags a release for every Hyprland
+  # version, so those are filled in here.
+  hy3Releases = {
+    "0.57" = {
+      version = "0.57.0";
+      hash = "sha256-9qAw3Xsa0xN9b5ERiWEGL1fBq37GLskcrBj/6ax8PU4=";
+    };
+  };
+  hy3Default =
+    let
+      hyprland = config.programs.hyprland.package;
+      hy3 = (pkgs.hyprlandPlugins.override { inherit hyprland; }).hy3;
+      wanted = lib.versions.majorMinor hyprland.version;
+      release = hy3Releases.${wanted};
+    in
+    if lib.versions.majorMinor hy3.version == wanted || !(hy3Releases ? ${wanted}) then
+      hy3
+    else
+      hy3.overrideAttrs {
+        inherit (release) version;
+        src = pkgs.fetchFromGitHub {
+          owner = "outfoxxed";
+          repo = "hy3";
+          tag = "hl${release.version}";
+          inherit (release) hash;
+        };
+      };
 
   # The "Hyprsimple" login entry exactly as hyprsimple-session.sh writes it
   # (the package keeps a copy), with uwsm's full path, as in Hyprland's own
@@ -263,11 +248,54 @@ in
     };
 
     groups.enable = lib.mkEnableOption ''
-      keys for window groups: windows stacked in one place with a tab for
-      each, the tabbed layout of i3. SUPER + G groups the window you are on,
+      keys for Hyprland's window groups: windows stacked in one place with a
+      tab for each. SUPER + G groups the window you are on,
       SUPER + ALT + an arrow moves a window into the group there, and
       SUPER + ALT + TAB goes to the next window in the group. The tabs follow
       the theme'';
+
+    i3 = {
+      enable = lib.mkEnableOption ''
+        the i3 layout next to Hyprland's own: windows in tabs and splits,
+        the way i3 arranges them, with the hy3 plugin. SUPER + CTRL + SPACE
+        switches the workspace you are on between the two. On an i3
+        workspace, new windows become tabs, a lone window fills the screen
+        without a tab bar, and SUPER + CTRL + H, J and E split like i3'';
+      workspaces = lib.mkOption {
+        type = lib.types.listOf lib.types.ints.positive;
+        default = [ ];
+        example = [
+          2
+          3
+        ];
+        description = ''
+          Workspaces that start in the i3 layout. The others start in
+          Hyprland's, and SUPER + CTRL + SPACE switches any of them.
+        '';
+      };
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = hy3Default;
+        defaultText = lib.literalMD "hy3 for `programs.hyprland.package`";
+        description = ''
+          The hy3 plugin. It has to be built for the Hyprland you run, which
+          the default is.
+        '';
+      };
+    };
+
+    bar.position = lib.mkOption {
+      type = lib.types.enum [
+        "top"
+        "bottom"
+      ];
+      default = "top";
+      example = "bottom";
+      description = ''
+        Where hyprsimple's bar sits. At the bottom, its panels, notifications
+        and tooltips open upwards out of it. A change shows at the next login.
+      '';
+    };
 
     loginEntry.enable = lib.mkEnableOption ''
       a "Hyprsimple" entry on the login screen, next to "Hyprland (UWSM)".
@@ -417,6 +445,9 @@ in
 
     # gsettings from a script only finds the schemas it writes when they are
     # on XDG_DATA_DIRS. Applications carry their own; the command does not.
+    # Read by the bar (patch 0010).
+    environment.sessionVariables.HYPRSIMPLE_BAR = lib.mkIf (cfg.bar.position == "bottom") "bottom";
+
     environment.sessionVariables.XDG_DATA_DIRS = [
       "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}"
     ];

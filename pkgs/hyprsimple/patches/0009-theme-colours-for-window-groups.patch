@@ -1,8 +1,8 @@
 diff --git a/.config/hypr/themes/templates/hyprland-colors.lua.tpl b/.config/hypr/themes/templates/hyprland-colors.lua.tpl
-index 04c0603..b840a79 100644
+index 04c0603..b36dc35 100644
 --- a/.config/hypr/themes/templates/hyprland-colors.lua.tpl
 +++ b/.config/hypr/themes/templates/hyprland-colors.lua.tpl
-@@ -5,4 +5,21 @@ hl.config({
+@@ -5,4 +5,48 @@ hl.config({
        inactive_border = "rgb({{ color8_strip }})",
      },
    },
@@ -24,3 +24,30 @@ index 04c0603..b840a79 100644
 +    },
 +  },
  })
++
++-- hyprsimple-nix: the tabs of the i3 layout (the hy3 plugin), when it is
++-- loaded, in the same colours.
++if hl.plugin.hy3 ~= nil then
++  hl.config({
++    plugin = {
++      hy3 = {
++        tabs = {
++          colors = {
++            active = "rgb({{ accent_strip }})",
++            active_border = "rgb({{ accent_strip }})",
++            active_text = "rgb({{ background_strip }})",
++            active_alt_monitor = "rgb({{ surface_strip }})",
++            active_alt_monitor_border = "rgb({{ color8_strip }})",
++            active_alt_monitor_text = "rgb({{ foreground_strip }})",
++            focused = "rgb({{ surface_strip }})",
++            focused_border = "rgb({{ accent_strip }})",
++            focused_text = "rgb({{ foreground_strip }})",
++            inactive = "rgb({{ surface_strip }})",
++            inactive_border = "rgb({{ surface_strip }})",
++            inactive_text = "rgb({{ foreground_strip }})",
++          },
++        },
++      },
++    },
++  })
++end

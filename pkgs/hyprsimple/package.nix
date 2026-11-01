@@ -33,7 +33,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   # Patches 1 to 4, 6 and 7 only add a branch taken when /etc/hyprsimple
   # exists, which the NixOS module creates; everywhere else those files
   # behave exactly as upstream wrote them. Patch 5 fixes a bug that affects
-  # every distribution, until upstream has the fix. Patches 8 and 9 are
+  # every distribution, until upstream has the fix. Patches 8 to 10 are
   # extras that stay invisible until the module's settings turn them on.
   patches = [
     # hyprsimple-update: take the version from the NixOS configuration instead
@@ -58,8 +58,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # Two extras, which change nothing until they are used. The bar shows
     # workspace names instead of dots...
     ./patches/0008-bar-workspace-names.patch
-    # ...and window groups take the theme's colours.
+    # ...window groups and the i3 layout's tabs take the theme's colours...
     ./patches/0009-theme-colours-for-window-groups.patch
+    # ...and the bar can sit at the bottom, its panels opening upwards.
+    ./patches/0010-bar-at-the-bottom.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a

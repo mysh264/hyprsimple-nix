@@ -45,10 +45,15 @@ describes parts 1 and 2 the NixOS way:
   Hyprland 0.57, and as on Arch, which never had it;
 - the "Hyprsimple" login entry, when you ask for it
   (`programs.hyprsimple.loginEntry.enable`);
-- two extras hyprsimple does not have (yet), off until you turn them on:
-  workspace names on the bar (`programs.hyprsimple.workspaces.names`) and
-  keys for window groups (`programs.hyprsimple.groups.enable`). They become
-  Lua in `/etc/hyprsimple/hyprland.lua`, which hyprsimple's own config loads.
+- extras hyprsimple does not have (yet), off until you turn them on:
+  workspace names on the bar (`programs.hyprsimple.workspaces.names`), keys
+  for window groups (`programs.hyprsimple.groups.enable`), the i3 layout
+  next to Hyprland's (`programs.hyprsimple.i3`, with the
+  [hy3](https://github.com/outfoxxed/hy3) plugin, built for your Hyprland),
+  and the bar at the bottom (`programs.hyprsimple.bar.position`). The first
+  three are the Lua in [`modules/hyprland.lua`](../modules/hyprland.lua),
+  written with your settings to `/etc/hyprsimple/hyprland.lua`, which
+  hyprsimple's own config loads.
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 
@@ -71,7 +76,7 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Nine small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+- Ten small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
   Numbers 1 to 4, 6 and 7 only do something when `/etc/hyprsimple` exists, so
   hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
@@ -95,8 +100,10 @@ NixOS:
   8. The bar shows a workspace's name instead of its dot, when it has one,
      and always shows workspaces that a rule names. Without names, it is the
      bar as before.
-  9. The theme templates give window groups the theme's colours. Without
-     groups, nobody sees them.
+  9. The theme templates give window groups, and the tabs of the i3
+     layout, the theme's colours. Without them, nobody sees these colours.
+  10. The bar can sit at the bottom: then its panels, notifications and
+     tooltips open upwards out of it. At the top, nothing changes.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -193,10 +200,13 @@ nix flake check   # the virtual machine test needs KVM
   that programs the session starts still know where the time zones are;
   opens a terminal program the way the app menu does; copies and pastes;
   takes a screenshot; switches the theme; moves the prayer time to the
-  right with the settings guide's commands; turns on workspace names and
-  window groups with a rebuild, groups three terminals with the keys, takes
-  one out and puts it back, and closes them one by one, the first one first,
-  checking each time that only that one closed; runs `hyprsimple-update`
+  right with the settings guide's commands; turns on the extras with a
+  rebuild; groups three terminals with the keys, takes one out and puts it
+  back, and closes them one by one, the first one first, checking each time
+  that only that one closed; in the i3 layout, checks that one window fills
+  the screen, that a second makes tabs, that the tabs split and come back,
+  and that SUPER + CTRL + SPACE switches a workspace, also through a reload;
+  moves the bar to the bottom and opens a panel and a notification there; runs `hyprsimple-update`
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the
