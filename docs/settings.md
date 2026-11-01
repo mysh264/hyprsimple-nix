@@ -161,6 +161,27 @@ muslimtify location set --auto
 `--auto` guesses your place from your internet connection. You can also
 give it exactly: `muslimtify location set --lat=-6.2 --long=106.8 --timezone=Asia/Jakarta --city=Jakarta`.
 
+**To move the prayer time to the right side of the bar,** next to the icons
+there (it starts on the left, next to the workspaces), open a terminal on
+your desktop (**SUPER + T**) and type these three lines:
+
+```sh
+f=~/.config/hyprsimple/plugins.json
+jq '.plugins.muslimtify.placement = "right"' "$f" > "$f.new" && mv "$f.new" "$f"
+~/.local/bin/hyprsimple-restart-bar.sh
+```
+
+The first two lines change the setting. The last one restarts the bar, so
+you see the change right away. Instead of `"right"` you can also write
+`"left"` (next to the workspaces, where it started) or `"center"` (next to
+the clock). This is your own setting, so updates keep it.
+
+Other plugins move the same way: write the plugin's name instead of
+`muslimtify`. `hyprsimple-plugin list` shows the names.
+
+> 💡 Type the lines in a terminal on your desktop, not on a text screen or
+> over SSH. From there, the restarted bar cannot find your desktop.
+
 ### LocalSend
 
 ```nix

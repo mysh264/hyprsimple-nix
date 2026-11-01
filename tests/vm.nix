@@ -331,6 +331,21 @@ pkgs.testers.runNixOSTest {
           missing_modules = re.findall(r'module "[^"]+" is not installed', journal)
           assert not missing_modules, missing_modules
 
+      with subtest("the settings guide's commands move the prayer time to the right"):
+          # Run as written, in the session, the way a terminal there runs them:
+          # what they start in the background (the new bar) outlives them.
+          guide = open("${../docs/settings.md}").read()
+          part = guide.split("**To move the prayer time to the right side of the bar,**")[1]
+          block = re.findall(r"```sh\n(.*?)```", part, re.S)[0]
+          print(user(f"systemd-run --user --wait --collect --pipe --quiet -p KillMode=process sh -c {shlex.quote(block)} 2>&1"))
+          user("jq -e '.plugins.muslimtify.placement == \"right\"' ~/.config/hyprsimple/plugins.json")
+          machine.wait_until_succeeds(
+              "pgrep -u alice -f 'qs -p /home/alice/.local/share/hyprsimple/default/quickshell'",
+              timeout=60,
+          )
+          machine.sleep(5)
+          machine.screenshot("prayer-time-right")
+
       with subtest("workspace names and window groups, turned on by a rebuild"):
           machine.succeed("${nodes.machine.system.build.toplevel}/specialisation/extras/bin/switch-to-configuration test")
           user("hyprctl reload")

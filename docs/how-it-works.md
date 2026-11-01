@@ -192,7 +192,8 @@ nix flake check   # the virtual machine test needs KVM
   notifications, helper services, home folders, keyring and search, and
   that programs the session starts still know where the time zones are;
   opens a terminal program the way the app menu does; copies and pastes;
-  takes a screenshot; switches the theme; turns on workspace names and
+  takes a screenshot; switches the theme; moves the prayer time to the
+  right with the settings guide's commands; turns on workspace names and
   window groups with a rebuild, groups three terminals with the keys, takes
   one out and puts it back, and closes them one by one, the first one first,
   checking each time that only that one closed; runs `hyprsimple-update`
