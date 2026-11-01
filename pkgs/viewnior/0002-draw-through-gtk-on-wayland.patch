@@ -1,0 +1,143 @@
+diff --git a/src/uni-image-view.c b/src/uni-image-view.c
+index e48fc44..082e9f4 100755
+--- a/src/uni-image-view.c
++++ b/src/uni-image-view.c
+@@ -324,68 +324,6 @@ uni_image_view_repaint_area (UniImageView * view, GdkRectangle * paint_rect, cai
+     return TRUE;
+ }
+ 
+-/**
+- * uni_image_view_fast_scroll:
+- *
+- * Actually scroll the views window using gdk_draw_drawable().
+- * GTK_WIDGET (view)->window is guaranteed to be non-NULL in this
+- * function.
+- **/
+-static void
+-uni_image_view_fast_scroll (UniImageView * view, int delta_x, int delta_y)
+-{
+-    int src_x, src_y;
+-    int dest_x, dest_y;
+-    if (delta_x < 0)
+-    {
+-        src_x = 0;
+-        dest_x = -delta_x;
+-    }
+-    else
+-    {
+-        src_x = delta_x;
+-        dest_x = 0;
+-    }
+-    if (delta_y < 0)
+-    {
+-        src_y = 0;
+-        dest_y = -delta_y;
+-    }
+-    else
+-    {
+-        src_y = delta_y;
+-        dest_y = 0;
+-    }
+-
+-    Size alloc = uni_image_view_get_allocated_size (view);
+-    GdkWindow *window = gtk_widget_get_window (GTK_WIDGET (view));
+-    cairo_t *cr = gdk_cairo_create (window);
+-    GdkPixbuf *win = gdk_pixbuf_get_from_window (window, src_x, src_y, alloc.width - abs (delta_x), alloc.height - abs (delta_y));
+-    gdk_cairo_set_source_pixbuf (cr, win, dest_x, dest_y);
+-    cairo_paint (cr);
+-    g_object_unref (win);
+-
+-    /* If we moved in both the x and y directions, two "strips" of the
+-       image becomes visible. One horizontal strip and one vertical
+-       strip. */
+-    GdkRectangle horiz_strip = {
+-        0,
+-        (delta_y < 0) ? 0 : alloc.height - abs (delta_y),
+-        alloc.width,
+-        abs (delta_y)
+-    };
+-    uni_image_view_repaint_area (view, &horiz_strip, cr);
+-
+-    GdkRectangle vert_strip = {
+-        (delta_x < 0) ? 0 : alloc.width - abs (delta_x),
+-        0,
+-        abs (delta_x),
+-        alloc.height
+-    };
+-    uni_image_view_repaint_area (view, &vert_strip, cr);
+-    cairo_destroy (cr);
+-}
+-
+ /**
+  * uni_image_view_scroll_to:
+  * @offset_x: X part of the offset in zoom space coordinates.
+@@ -434,13 +372,12 @@ uni_image_view_scroll_to (UniImageView * view,
+         g_signal_handlers_unblock_by_data (G_OBJECT (view->priv->vadjustment), view);
+     }
+ 
++    /* Always redrawn through GTK. Before, a drag copied the window's
++     * pixels from the screen and drew them, moved, straight onto the
++     * window, outside GTK's drawing: that only shows on X11, and on Wayland
++     * the image stood still while it was dragged. */
+     if (window)
+-    {
+-        if (invalidate)
+-            gdk_window_invalidate_rect (window, NULL, TRUE);
+-        else
+-            uni_image_view_fast_scroll (view, delta_x, delta_y);
+-    }
++        gdk_window_invalidate_rect (window, NULL, TRUE);
+ }
+ 
+ static void
+diff --git a/src/vnr-crop.c b/src/vnr-crop.c
+index 9f8acf7..869eca3 100644
+--- a/src/vnr-crop.c
++++ b/src/vnr-crop.c
+@@ -43,20 +43,26 @@ static gboolean drawable_motion_cb (GtkWidget *widget,
+ /*************************************************************/
+ /***** Private actions ***************************************/
+ /*************************************************************/
++/* The rectangle is drawn by the image's draw handler, through GTK. Before,
++ * it was drawn straight onto the window, and drawn over again to wipe it,
++ * which only shows on X11: on Wayland there was no rectangle to see. */
++static void
++vnr_crop_paint_rectangle(VnrCrop *crop, cairo_t *cr)
++{
++    cairo_save(cr);
++    cairo_set_operator(cr, CAIRO_OPERATOR_DIFFERENCE);
++    cairo_set_line_width(cr, 3);
++    cairo_rectangle(cr, (int)crop->sub_x + 0.5, (int)crop->sub_y + 0.5, (int)crop->sub_width, (int)crop->sub_height);
++    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
++    cairo_stroke(cr);
++    cairo_restore(cr);
++}
++
+ static void
+ vnr_crop_draw_rectangle(VnrCrop *crop)
+ {
+-    cairo_t *cr;
+     if(crop->do_redraw)
+-    {
+-        cr = gdk_cairo_create(gtk_widget_get_window(crop->image));
+-        cairo_set_operator(cr, CAIRO_OPERATOR_DIFFERENCE);
+-        cairo_set_line_width(cr, 3);
+-        cairo_rectangle(cr, (int)crop->sub_x + 0.5, (int)crop->sub_y + 0.5, (int)crop->sub_width, (int)crop->sub_height);
+-        cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
+-        cairo_stroke(cr);
+-        cairo_destroy(cr);
+-    }
++        gtk_widget_queue_draw(crop->image);
+ }
+ 
+ static inline void
+@@ -295,7 +301,8 @@ drawable_expose_cb (GtkWidget *widget, cairo_t *cr, VnrCrop *crop)
+         crop->sub_height = crop->height;
+     }
+     cairo_restore(cr);
+-    vnr_crop_clear_rectangle (crop);
++    if(crop->do_redraw)
++        vnr_crop_paint_rectangle (crop, cr);
+ 
+     return FALSE;
+ }

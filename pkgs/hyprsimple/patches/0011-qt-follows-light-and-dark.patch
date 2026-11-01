@@ -1,0 +1,41 @@
+diff --git a/.local/bin/theme-switcher.sh b/.local/bin/theme-switcher.sh
+index 58ee0ad..cec94a2 100755
+--- a/.local/bin/theme-switcher.sh
++++ b/.local/bin/theme-switcher.sh
+@@ -160,6 +160,36 @@ for gtk_dir in "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"; do
+   set_gtk_theme_name "$gtk_dir/settings.ini" "$GTK_THEME_NAME"
+ done
+ 
++# hyprsimple-nix: Qt programs the same light or dark as GTK. uwsm/env makes
++# Kvantum their style, and Kvantum without a theme of its own is light, so
++# they stayed light with every theme. KvGnome and KvGnomeDark are Kvantum's
++# Adwaita and Adwaita-dark, the GTK themes above. A Kvantum theme you chose
++# yourself (in Kvantum Manager) is left alone. Qt programs read it when they
++# start, so one that is open changes when you open it again.
++set_kvantum_theme() {
++  local file="$HOME/.config/Kvantum/kvantum.kvconfig" theme="$1" current=""
++  if [[ -f $file ]]; then
++    current=$(sed -n 's/^[[:space:]]*theme[[:space:]]*=[[:space:]]*//p' "$file" | head -1)
++  fi
++  case $current in
++    "" | KvGnome | KvGnomeDark) ;;
++    *) return 0 ;;
++  esac
++  mkdir -p "${file%/*}"
++  if [[ -n $current ]]; then
++    sed -i "s/^[[:space:]]*theme[[:space:]]*=.*/theme=$theme/" "$file"
++  elif [[ -f $file ]] && grep -q '^\[General\]' "$file"; then
++    sed -i "/^\[General\]/a theme=$theme" "$file"
++  else
++    printf '[General]\ntheme=%s\n' "$theme" >>"$file"
++  fi
++}
++if [[ -f "$THEME_PATH/light.mode" ]]; then
++  set_kvantum_theme KvGnome
++else
++  set_kvantum_theme KvGnomeDark
++fi
++
+ # Icon theme (icons.theme = omarchy style, icon-theme = hyprsimple style)
+ if [[ -f "$THEME_PATH/icons.theme" ]]; then
+   gsettings set org.gnome.desktop.interface icon-theme "$(cat "$THEME_PATH/icons.theme")"

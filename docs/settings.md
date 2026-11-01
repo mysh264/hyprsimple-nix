@@ -95,6 +95,106 @@ Good to know:
   `default_name` in your own files in `~/.config/hypr`, works too. The bar
   shows those names the same way.
 
+### Put apps on their own workspace
+
+```nix
+  programs.hyprsimple.workspaces.apps = {
+    "1" = [ "firefox" "brave" "zen" "chrome" "chromium" ];
+    "2" = [ "claude" "cursor" ];
+    "4" = [ "kate" "gedit" ];
+    "6" = [ "mpv" ];
+    "7" = [ "viewnior" ];
+    "8" = [ "jellyfin" ];
+    "9" = [ "steam" ];
+  };
+```
+
+Every app in a list always opens on that workspace, and that workspace
+comes to the front. Here, Firefox always opens on workspace 1, mpv on 6, and
+Steam on 9.
+
+1. Add the lines to `configuration.nix`, with your own apps. The workspace
+   number goes in quotes (`"6"`), the apps in the list after it.
+2. Rebuild, then type `hyprctl reload` (or log out and in).
+
+**How do I find an app's name?** hyprsimple-nix looks at the app's *window
+class*, the name the app gives its windows. A part of it is enough, and big
+or small letters do not matter: `"firefox"` also finds `org.mozilla.firefox`.
+To see the class:
+
+1. Open the app.
+2. Open a terminal (**SUPER + T**) and type `hyprctl clients`.
+3. Find your app in the list, and look at the line that starts with
+   `class:`. That word, or a part of it, goes in your list.
+
+> 💡 A part matches anything that contains it. `"steam"` also matches Steam's
+> games (their class starts with `steam_app_`), so they open on workspace 9
+> too. If a short name catches an app you did not mean, write more of it.
+
+### Keys for workspaces 11 and 12
+
+```nix
+  programs.hyprsimple.keys.workspaces11and12.enable = true;
+```
+
+**SUPER + 1** to **SUPER + 0** go to workspaces 1 to 10. This line adds the
+two keys right after **0**:
+
+| Press | What happens |
+|---|---|
+| **SUPER + -** | You go to workspace 11 |
+| **SUPER + =** | You go to workspace 12 |
+| **SUPER + SHIFT + -** | The window you are on moves to workspace 11 |
+| **SUPER + SHIFT + =** | The window you are on moves to workspace 12 |
+
+1. Add the line to `configuration.nix`.
+2. Rebuild, then type `hyprctl reload` (or log out and back in).
+
+What counts is the keys' **place**: on a keyboard that is not English, they
+are still the two keys right of **0**.
+
+> 💡 Workspaces 11 and 12 can have names too: write 12 names in
+> [`workspaces.names`](#name-your-workspaces).
+
+### The number pad
+
+```nix
+  programs.hyprsimple.keys.numpad.enable = true;
+```
+
+The number pad (the block of number keys on the right of big keyboards)
+becomes a remote control for your workspaces and windows, the way many i3
+users set it up:
+
+| Number pad key | What happens |
+|---|---|
+| **4** | The workspace before |
+| **6** | The workspace after |
+| **8** | The first workspace |
+| **2** | The last workspace |
+| **5** or **0** | Back to the workspace you were on before |
+| **1** | Focus the window on the left |
+| **3** | Focus the window on the right |
+| **7** | Move the window to the left |
+| **9** | Move the window to the right |
+| **SHIFT + 1** … **SHIFT + 9** | Workspace 1 … 9 |
+| **SHIFT + 0** | Workspace 10 |
+
+"First" and "last" mean the first and the last workspace that has windows
+(or that you are on). The keys work with Num Lock on and off.
+
+1. Add the line to `configuration.nix`.
+2. Rebuild, then type `hyprctl reload` (or log out and back in).
+
+> ⚠️ With this on, the number pad does not type numbers any more, in any
+> program. The number keys above the letters still do. If you want the
+> number pad for numbers, leave this off: [the number pad, by
+> hand](keys.md#the-number-pad-by-hand) shows how to give it jobs only while
+> you hold **SUPER**.
+
+To change other keys, mouse buttons and the touchpad, see
+[Keys, mouse buttons and the touchpad](keys.md).
+
 ### Window groups (tabs)
 
 ```nix
@@ -254,6 +354,127 @@ hyprsimple opens network port 53317 in the firewall, so that
 [LocalSend](https://localsend.org) can send files between your devices. If
 you do not use LocalSend, you can close it with this line.
 
+### Viewnior, the photo viewer, mended for Wayland
+
+```nix
+  programs.hyprsimple.viewnior.enable = true;
+```
+
+[Viewnior](https://siyanpanayotov.com/project/viewnior/) has three problems
+on Wayland:
+
+- Two fingers on the touchpad can neither zoom a photo nor go to the next
+  one. Only a mouse wheel works.
+- When you zoom in and drag the photo to see another part of it, it stands
+  still. (Zoomed out, all seems fine, because there is nothing to drag.)
+- When you crop, you do not see the rectangle you are choosing.
+
+On X11 all of this works, which is why some people start Viewnior with
+`GDK_BACKEND=x11`. This line installs a mended Viewnior instead, which
+hyprsimple-nix fixed for Wayland.
+
+1. Add the line to `configuration.nix`. If `viewnior` is also in your
+   `environment.systemPackages`, you can leave it there: the mended one is
+   used either way.
+2. Rebuild.
+3. Close Viewnior if it is open, and open a photo again.
+4. Put two fingers on the touchpad and move them up or down: the photo
+   zooms in and out. A mouse wheel works as before: one click, one step.
+5. Zoom in, then hold the left button on the photo and move the mouse: the
+   photo moves with it.
+
+If you set Viewnior's wheel to **Navigate images** (in its Preferences),
+two fingers go to the next and the previous photo instead.
+
+> 💡 Did you make Viewnior start with `GDK_BACKEND=x11`? Undo it, so it runs
+> on Wayland again: delete your copy of its start file,
+> `rm ~/.local/share/applications/viewnior.desktop`, if you made one. On
+> Wayland it is sharp on a scaled screen and follows your theme.
+
+Rather have a photo viewer made for Wayland, with Viewnior's keys? See
+[Viewnior's keys in swayimg and imv](#viewniors-keys-in-swayimg-and-imv).
+
+**Make Viewnior the app that opens your photos.** In a terminal:
+
+```sh
+xdg-mime default viewnior.desktop image/jpeg image/png image/gif image/webp image/bmp image/tiff
+```
+
+Now a double click on a photo in the file manager opens it in Viewnior.
+
+### Viewnior's keys in swayimg and imv
+
+```nix
+  programs.hyprsimple.viewniorKeys.enable = true;
+```
+
+swayimg is hyprsimple's photo viewer. imv is another one, small and fast.
+Both are made for Wayland, so the touchpad, dragging a photo and sharp
+pictures just work. This line gives both of them Viewnior's keys, so your
+fingers do not have to learn new ones. It installs imv as well.
+
+1. Add the line to `configuration.nix`.
+2. Rebuild.
+3. Open a photo with swayimg: in the file manager, right-click the photo,
+   pick **Open With**, then **swayimg**. Or in a terminal:
+   `swayimg photo.jpg` (or `imv-dir photo.jpg`).
+4. The other photos in the same folder come along, so you can turn through
+   them with the keys below.
+
+| Press | What happens |
+|---|---|
+| **Space**, **Page Down** | The next photo |
+| **Backspace**, **Page Up** | The previous photo |
+| **→** and **↓** / **←** and **↑** | The next / the previous photo. In a zoomed-in photo (in swayimg), they move about in it instead, as in Viewnior |
+| **SHIFT + an arrow** | Move about in a zoomed-in photo |
+| **Home** / **End** | The first / the last photo in the folder |
+| **+** or **=** | Zoom in |
+| **-** | Zoom out |
+| **1**, **2**, **3** | 100%, 200%, 300% (imv: only **1**) |
+| **f** or **0** | Fit the photo to the window |
+| **CTRL + R** | Turn it right |
+| **CTRL + SHIFT + R** | Turn it left |
+| **h** / **v** | Flip it left-right / upside down |
+| **F11** | Full screen |
+| **F5** | Slideshow, a new photo every 5 seconds (imv: **SHIFT + F5** stops it) |
+| **Delete** | Move the photo to the trash. It is not gone: the file manager's **Trash** has it |
+| **Esc** or **CTRL + W** | Close. In swayimg, in full screen, **Esc** leaves full screen first |
+| The mouse wheel | Zoom in and out where the pointer is |
+| **SHIFT** + the mouse wheel | The next / the previous photo (swayimg) |
+| Hold the left button and move | Move a zoomed-in photo |
+| The mouse's side buttons | The previous / the next photo (swayimg) |
+
+**Make it the app that opens your photos.** In a terminal:
+
+```sh
+xdg-mime default swayimg.desktop image/jpeg image/png image/gif image/webp image/bmp image/tiff
+```
+
+For imv, write `imv-dir.desktop` instead of `swayimg.desktop`: it opens the
+photo's whole folder, so you can turn through it.
+
+**Change a key.** The keys are in a file hyprsimple-nix makes. Copy it to
+your home folder, and change your copy: yours is read instead.
+
+- swayimg on NixOS unstable (swayimg 5):
+  ```sh
+  mkdir -p ~/.config/swayimg
+  cp /etc/xdg/swayimg/init.lua ~/.config/swayimg/init.lua
+  ```
+- swayimg on NixOS 26.05 (swayimg 4):
+  ```sh
+  mkdir -p ~/.config/swayimg
+  cp /etc/xdg/swayimg/config ~/.config/swayimg/config
+  ```
+- imv:
+  ```sh
+  mkdir -p ~/.config/imv
+  cp /etc/imv_config ~/.config/imv/config
+  ```
+
+Each key has a note above it in the file. (Your copy does not change when a
+new hyprsimple-nix improves the original.)
+
 ### A "Hyprsimple" entry on the login screen
 
 ```nix
@@ -382,13 +603,14 @@ overwrites your changes to them.
 |---|---|
 | Screens (size, position, scaling) | `~/.config/hypr/monitors.lua` |
 | Keyboard layout, mouse, touchpad | `~/.config/hypr/input.lua` |
-| Your own key combinations | `~/.config/hypr/bindings/applications.lua` |
+| Your own key combinations and mouse buttons | `~/.config/hypr/bindings/applications.lua` |
 | Gaps, borders, animations | `~/.config/hypr/looknfeel.lua` |
 | Programs that start when you log in | `~/.config/hypr/autostart.lua` |
 | Your default terminal, browser, file manager | `~/.config/hypr/vars.lua` |
 
 Each file explains itself with notes at the top. After saving, type
-`hyprctl reload` in a terminal.
+`hyprctl reload` in a terminal. For keys, mouse buttons and the touchpad,
+[Keys, mouse buttons and the touchpad](keys.md) shows you how, step by step.
 
 > ⚠️ Don't change the files in `~/.local/share/hyprsimple`. Those are
 > hyprsimple's own, and `hyprsimple-update` replaces them with every new

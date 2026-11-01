@@ -55,7 +55,8 @@ with examples:
 | [Installing](docs/install.md) | Getting hyprsimple onto your computer, step by step |
 | [Graphics cards](docs/gpu.md) | Intel, AMD, NVIDIA, and laptops with two graphics chips |
 | [Updating](docs/update.md) | Getting new hyprsimple versions |
-| [Changing settings](docs/settings.md) | Workspace names, window groups (tabs), the i3 layout, the bar at the bottom, leaving out apps, prayer times, your own keys and screens |
+| [Changing settings](docs/settings.md) | Workspace names, apps on their own workspace, keys for workspaces 11 and 12, the number pad, window groups (tabs), the i3 layout, the bar at the bottom, a mended Viewnior, Viewnior's keys in swayimg and imv, leaving out apps, prayer times, your own keys and screens |
+| [Keys, mouse buttons and the touchpad](docs/keys.md) | Changing what your keys, each mouse button and touchpad swipes do |
 | [When something goes wrong](docs/troubleshooting.md) | Fixes for common problems, and how to ask for help |
 | [Removing](docs/uninstall.md) | Taking hyprsimple off again, and getting your old settings back |
 | [How it works](docs/how-it-works.md) | What hyprsimple-nix does behind the scenes, and how it is tested |

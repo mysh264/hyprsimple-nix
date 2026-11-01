@@ -86,7 +86,38 @@ let
   # What programs.hyprsimple adds to Hyprland's configuration: the settings,
   # then the code in hyprland.lua that acts on them. hyprsimple's own config
   # loads it (patch 0007), before the user's files in ~/.config.
-  extrasOn = cfg.workspaces.names != [ ] || cfg.groups.enable || cfg.i3.enable;
+  extrasOn =
+    cfg.workspaces.names != [ ]
+    || cfg.workspaces.apps != { }
+    || cfg.groups.enable
+    || cfg.i3.enable
+    || cfg.keys.workspaces11and12.enable
+    || cfg.keys.numpad.enable;
+
+  # An app's window class, matched by a part of it, in any letter case.
+  appRules = lib.concatLists (
+    lib.mapAttrsToList (
+      workspace: apps:
+      map (app: {
+        inherit workspace;
+        class = "(?i).*" + lib.strings.escapeRegex app + ".*";
+      }) apps
+    ) cfg.workspaces.apps
+  );
+  luaAppRule = rule: "{ workspace = ${luaString rule.workspace}, class = ${luaString rule.class} }";
+
+  # Viewnior's keys for swayimg and imv (programs.hyprsimple.viewniorKeys).
+  # swayimg 5 is set up in Lua, swayimg 4 in an INI file. Delete moves a photo
+  # to the trash with gio.
+  withGio =
+    file: builtins.replaceStrings [ "@gio@" ] [ "${pkgs.glib.bin}/bin/gio" ] (builtins.readFile file);
+  swayimgLua = lib.versionAtLeast pkgs.swayimg.version "5";
+  viewniorKeysFiles = {
+    ${if swayimgLua then "xdg/swayimg/init.lua" else "xdg/swayimg/config"}.text = withGio (
+      if swayimgLua then ./viewnior-keys/swayimg.lua else ./viewnior-keys/swayimg-4.ini
+    );
+    "imv_config".text = withGio ./viewnior-keys/imv.ini;
+  };
   hyprlandLua = ''
     -- Written by hyprsimple-nix from programs.hyprsimple in your NixOS
     -- configuration. Change the settings there and rebuild: this file is
@@ -95,10 +126,13 @@ let
   + lib.optionalString extrasOn ''
     local nix = {
       names = ${luaList luaString cfg.workspaces.names},
+      apps = ${luaList luaAppRule appRules},
       groups = ${lib.boolToString cfg.groups.enable},
       i3 = ${lib.boolToString cfg.i3.enable},
       i3_workspaces = ${luaList toString cfg.i3.workspaces},
       hy3 = ${luaString (lib.optionalString cfg.i3.enable "${cfg.i3.package}/lib/libhy3.so")},
+      workspaces_11_12 = ${lib.boolToString cfg.keys.workspaces11and12.enable},
+      numpad = ${lib.boolToString cfg.keys.numpad.enable},
     }
 
     ${builtins.readFile ./hyprland.lua}'';
@@ -247,6 +281,23 @@ in
       '';
     };
 
+    workspaces.apps = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf (lib.types.strMatching "[^\n]+"));
+      default = { };
+      example = lib.literalExpression ''
+        {
+          "1" = [ "firefox" "brave" "zen" "chrome" "chromium" ];
+          "6" = [ "mpv" ];
+        }
+      '';
+      description = ''
+        Apps that always open on a workspace: the workspace's number, and the
+        apps for it. An app is a part of its window class, in any letter
+        case (`hyprctl clients` shows the class), so "firefox" also matches
+        "org.mozilla.firefox".
+      '';
+    };
+
     groups.enable = lib.mkEnableOption ''
       keys for Hyprland's window groups: windows stacked in one place with a
       tab for each. SUPER + G groups the window you are on,
@@ -284,6 +335,36 @@ in
       };
     };
 
+    keys.workspaces11and12.enable = lib.mkEnableOption ''
+      keys for workspaces 11 and 12, after SUPER + 1 to 0: SUPER + - goes to
+      workspace 11 and SUPER + = to workspace 12, and with SHIFT they move the
+      window you are on there. They are the two keys after 0 on the
+      keyboard, whatever its layout'';
+
+    keys.numpad.enable = lib.mkEnableOption ''
+      the number pad as workspace keys, set up the way many i3 users have
+      it: 4 and 6 go to the workspace before and after, 8 to the first
+      workspace and 2 to the last, 5 and 0 back to the workspace you were on
+      before, 1 and 3 move the focus left and right, 7 and 9 move the window
+      left and right, and SHIFT + 1 to 9 go to that workspace (SHIFT + 0 to
+      workspace 10). With this, the number pad no longer types numbers'';
+
+    viewniorKeys.enable = lib.mkEnableOption ''
+      Viewnior's keys and mouse in swayimg, hyprsimple's photo viewer, and in
+      imv, which this installs as well: Space and Backspace for the next and
+      the previous photo, + and - to zoom, 1 for 100%, f to fit the window,
+      Ctrl+R to turn, h and v to flip, F11 for full screen, F5 for a
+      slideshow, Delete to move a photo to the trash, Esc to close. A
+      ~/.config/swayimg or ~/.config/imv/config file of your own is read
+      instead'';
+
+    viewnior.enable = lib.mkEnableOption ''
+      Viewnior, the photo viewer, mended for Wayland. Unmended, it misses a
+      touchpad's scrolling there (two fingers neither zoom nor turn to the
+      next photo, only a mouse wheel does), a zoomed-in photo stands still
+      when you drag it, and the crop dialog shows no rectangle. If
+      pkgs.viewnior is installed as well, this one takes its place'';
+
     bar.position = lib.mkOption {
       type = lib.types.enum [
         "top"
@@ -308,6 +389,13 @@ in
 
   config = lib.mkIf cfg.enable {
     assertions = [
+      {
+        assertion = lib.all (n: builtins.match "[1-9][0-9]*" n != null) (lib.attrNames cfg.workspaces.apps);
+        message = ''
+          programs.hyprsimple.workspaces.apps takes workspace numbers, like
+          "1" or "6", and ${toString (lib.attrNames cfg.workspaces.apps)} are not all numbers.
+        '';
+      }
       {
         assertion = lib.versionAtLeast config.programs.hyprland.package.version "0.55";
         message = ''
@@ -435,7 +523,10 @@ in
       ++ keep desktopBasics
       ++ [ cfg.package ]
       ++ lib.optional cfg.muslimtify.enable cfg.muslimtify.package
-      ++ lib.optional cfg.loginEntry.enable loginEntry;
+      ++ lib.optional cfg.loginEntry.enable loginEntry
+      # Ahead of a pkgs.viewnior in the same list, which has the same files.
+      ++ lib.optional cfg.viewnior.enable (lib.hiPrio hyprsimplePkgs.viewnior)
+      ++ lib.optional cfg.viewniorKeys.enable pkgs.imv;
 
     fonts.packages =
       keep (lib.concatMap (e: e.fonts or [ ]) (lib.attrValues mapping))
@@ -498,6 +589,7 @@ in
         HYPRSIMPLE_NIX_DEFAULT_THEME=${lib.escapeShellArg cfg.defaultTheme}
         HYPRSIMPLE_NIX_MUSLIMTIFY=${if cfg.muslimtify.enable then "1" else "0"}
       '';
-    };
+    }
+    // lib.optionalAttrs cfg.viewniorKeys.enable viewniorKeysFiles;
   };
 }

@@ -1,5 +1,6 @@
 -- hyprsimple-nix's additions to Hyprland's configuration: workspace names,
--- window groups and the i3 layout, each when programs.hyprsimple turns it on.
+-- apps on their own workspace, window groups, the i3 layout and more keys,
+-- each when programs.hyprsimple turns it on.
 -- hyprsimple's own config loads this file (patch 0007), after its defaults
 -- and before your files in ~/.config/hypr, so your settings still win. The
 -- `nix` table above it holds the settings from your NixOS configuration.
@@ -12,6 +13,13 @@ end
 
 for number, name in ipairs(nix.names) do
   hl.workspace_rule({ workspace = tostring(number), default_name = name })
+end
+
+-- ---- Apps on their own workspace -------------------------------------------
+
+-- Each opens on its workspace, and that workspace comes to the front.
+for _, app in ipairs(nix.apps) do
+  hl.window_rule({ match = { class = app.class }, workspace = app.workspace })
 end
 
 -- ---- The i3 layout: the hy3 plugin ------------------------------------------
@@ -288,5 +296,60 @@ if hy3 then
       either(hl.dsp.focus({ direction = way[2] }), hy3.move_focus(way[2])),
       "Focus " .. way[3]
     )
+  end
+end
+
+-- ---- Keys for workspaces 11 and 12 ------------------------------------------
+
+-- Keys are named by their place on the keyboard (code:), so they stay where
+-- they are in every keyboard layout. 20 and 21 are the two keys after 0,
+-- - and = on a US keyboard.
+if nix.workspaces_11_12 then
+  for _, key in ipairs({ { 20, "11" }, { 21, "12" } }) do
+    local code, workspace = "code:" .. key[1], key[2]
+    bind("SUPER + " .. code, hl.dsp.focus({ workspace = workspace }), "Workspace " .. workspace)
+    bind("SUPER + SHIFT + " .. code, hl.dsp.window.move({ workspace = workspace }), "Move to Workspace " .. workspace)
+  end
+end
+
+-- ---- The number pad ---------------------------------------------------------
+
+if nix.numpad then
+  -- The number pad's keys, by their place: they are the same keys with
+  -- Num Lock on and off.
+  local pad = { [0] = 90, 87, 88, 89, 83, 84, 85, 79, 80, 81 }
+  local function key(number)
+    return "code:" .. pad[number]
+  end
+
+  -- The first or the last workspace there is now.
+  local function edge(last)
+    return function()
+      local found
+      for _, workspace in ipairs(hl.get_workspaces()) do
+        local id = workspace.id
+        if not workspace.special and id > 0 and (found == nil or (last and id > found) or (not last and id < found)) then
+          found = id
+        end
+      end
+      if found then
+        hl.dispatch(hl.dsp.focus({ workspace = tostring(found) }))
+      end
+    end
+  end
+
+  bind(key(4), hl.dsp.focus({ workspace = "e-1" }), "Workspace Before")
+  bind(key(6), hl.dsp.focus({ workspace = "e+1" }), "Workspace After")
+  bind(key(8), edge(false), "First Workspace")
+  bind(key(2), edge(true), "Last Workspace")
+  bind(key(5), hl.dsp.focus({ workspace = "previous" }), "Back to the Workspace Before")
+  bind(key(0), hl.dsp.focus({ workspace = "previous" }), "Back to the Workspace Before")
+  bind(key(1), either(hl.dsp.focus({ direction = "l" }), hy3 and hy3.move_focus("l")), "Focus Left")
+  bind(key(3), either(hl.dsp.focus({ direction = "r" }), hy3 and hy3.move_focus("r")), "Focus Right")
+  bind(key(7), either(hl.dsp.window.move({ direction = "l" }), hy3 and hy3.move_window("l")), "Move Window Left")
+  bind(key(9), either(hl.dsp.window.move({ direction = "r" }), hy3 and hy3.move_window("r")), "Move Window Right")
+  for number = 0, 9 do
+    local workspace = tostring(number == 0 and 10 or number)
+    bind("SHIFT + " .. key(number), hl.dsp.focus({ workspace = workspace }), "Workspace " .. workspace)
   end
 end

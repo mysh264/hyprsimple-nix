@@ -24,6 +24,8 @@
       };
 
       # hyprsimple, hyprqt6engine and muslimtify, for use outside the module.
+      # The mended Viewnior is only a package below: as an overlay it would
+      # take the place of the Viewnior it is made from.
       overlays.default =
         final: _prev:
         let
@@ -39,7 +41,12 @@
           p = import ./pkgs { inherit pkgs; };
         in
         {
-          inherit (p) hyprsimple hyprqt6engine muslimtify;
+          inherit (p)
+            hyprsimple
+            hyprqt6engine
+            muslimtify
+            viewnior
+            ;
           default = p.hyprsimple;
         }
       );

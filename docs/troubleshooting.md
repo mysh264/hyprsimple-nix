@@ -15,6 +15,10 @@ do.
 [Hyprland does not start](#hyprland-does-not-start) ·
 [No bar at the top](#no-bar-at-the-top) ·
 [No wallpaper, or no password window](#no-wallpaper-or-no-password-window) ·
+[A new setting does not show](#a-new-setting-does-not-show) ·
+[A key, button or swipe of mine does nothing](#a-key-button-or-swipe-of-mine-does-nothing) ·
+[Viewnior does not zoom, or a zoomed photo does not move](#viewnior-does-not-zoom-or-a-zoomed-photo-does-not-move) ·
+[Qt programs do not change with the theme](#qt-programs-do-not-change-with-the-theme) ·
 [The file manager shows only Pictures and Videos](#the-file-manager-shows-only-pictures-and-videos) ·
 [The lock screen does not take my password](#the-lock-screen-does-not-take-my-password) ·
 [zoxide warns about its configuration](#zoxide-warns-about-its-configuration) ·
@@ -142,6 +146,73 @@ all. To fix it:
 2. Type `hyprsimple-update`. Before anything else, it ties the helpers to
    your current system again, and restarts them. The wallpaper is back right
    away, even if `hyprsimple-update` then stops for another reason.
+
+## A new setting does not show
+
+You set something in `configuration.nix` (the bar at the bottom, workspace
+names, ...) and rebuilt, but your desktop still looks the same.
+
+1. **Log out and back in.** Some settings (the bar at the bottom) are only
+   read when you log in.
+2. **Still the same?** Type `hyprsimple-nixos status`. If it says that files
+   in `~/.local/share/hyprsimple` were changed by hand, `hyprsimple-update`
+   has been stopping, and nothing new reaches you, not even hyprsimple-nix's
+   fixes. Put those changes aside (you keep a copy), and update:
+
+   ```sh
+   git -C ~/.local/share/hyprsimple stash --include-untracked
+   hyprsimple-update
+   ```
+
+   Then log out and back in.
+
+Changes of your own belong in `~/.config/hypr`, never in
+`~/.local/share/hyprsimple`: see
+[Your desktop's own settings](settings.md#your-desktops-own-settings).
+
+## A key, button or swipe of mine does nothing
+
+You added a line to `~/.config/hypr/bindings/applications.lua` or
+`~/.config/hypr/input.lua`, and nothing happens.
+
+1. **Load it.** Type `hyprctl reload`.
+2. **Look for mistakes.** Type `hyprctl configerrors`. If it names a line,
+   fix that line, save, and `hyprctl reload` again.
+3. **Is the key already busy?** If the keys already did something else, put
+   `hl.unbind("THE + KEYS")` in front of your line (see
+   [Change a key that already does something](keys.md#change-a-key-that-already-does-something)).
+4. **Is the name right?** Ask wev what your key or button is called (see
+   [What is a key's name?](keys.md#what-is-a-keys-name)).
+
+## Viewnior does not zoom, or a zoomed photo does not move
+
+On Wayland, Viewnior does not notice the touchpad, and a zoomed-in photo
+stands still when you drag it. Turn on the mended one:
+[Viewnior, the photo viewer, mended for Wayland](settings.md#viewnior-the-photo-viewer-mended-for-wayland).
+Or use swayimg or imv, which are made for Wayland, with Viewnior's keys:
+[Viewnior's keys in swayimg and imv](settings.md#viewniors-keys-in-swayimg-and-imv).
+
+## Qt programs do not change with the theme
+
+Qt programs are the ones made with Qt, like Dolphin, Kate, Konsole, VLC and
+qBittorrent. With hyprsimple-nix they follow your theme's **light or dark**,
+as GTK programs do. (Neither kind takes the theme's exact colours; only the
+bar, the terminal and Hyprland's own parts do.)
+
+1. **Close the program and open it again.** Qt programs look at the theme
+   when they start.
+2. **Still the old one?** Pick your theme once more: **SUPER + SHIFT + T**.
+   (After an update, the theme switcher only does this from your next
+   switch on.)
+3. **Still not?** You may have chosen a Kvantum theme yourself, in Kvantum
+   Manager. hyprsimple leaves your choice alone. To let the theme decide
+   again, type:
+
+   ```sh
+   rm ~/.config/Kvantum/kvantum.kvconfig
+   ```
+
+   and pick your theme again (**SUPER + SHIFT + T**).
 
 ## The file manager shows only Pictures and Videos
 

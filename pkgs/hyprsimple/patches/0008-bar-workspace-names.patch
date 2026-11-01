@@ -1,8 +1,8 @@
 diff --git a/default/quickshell/bar/Workspaces.qml b/default/quickshell/bar/Workspaces.qml
-index 6d3f411..bceae54 100644
+index 6d3f411..8c7d52a 100644
 --- a/default/quickshell/bar/Workspaces.qml
 +++ b/default/quickshell/bar/Workspaces.qml
-@@ -1,39 +1,118 @@
+@@ -1,58 +1,154 @@
  import QtQuick
  import Quickshell.Hyprland
 +import Quickshell.Io
@@ -12,10 +12,12 @@ index 6d3f411..bceae54 100644
  // Workspace capsule. 1 to 5 are always shown, higher ones while they exist.
  // Each is a dot, small and dim when empty, and an accent pill slides to the focused one.
 +//
-+// hyprsimple-nix: a workspace with a name shows the name instead of the dot, and
-+// one named by a workspace rule is always shown, also while it is empty. Names
-+// come from Hyprland: a rule's default_name, or a name given at runtime.
-+// Without any names this is the capsule above, unchanged.
++// hyprsimple-nix: a workspace with a name shows the name instead of the dot, in
++// a cell as wide as its name, and one named by a workspace rule is always
++// shown, also while it is empty. Names come from Hyprland: a rule's
++// default_name, or a name given at runtime. Without any names this is the
++// capsule above. Whether a workspace has windows comes from Hyprland's own
++// count as well: Quickshell's list of windows missed some.
  Rectangle {
      id: root
  
@@ -46,13 +48,18 @@ index 6d3f411..bceae54 100644
      // Wheel delta collected until one notch (120), so touchpads do not skip workspaces.
      property real wheelDelta: 0
  
-+    // A dot's cell, or with names one wide enough for the longest label, so the
-+    // accent pill still moves in equal steps.
-+    readonly property real cellWidth: {
-+        if (!named) return Theme.workspaceCell
-+        let widest = 0
-+        for (const id of ids) widest = Math.max(widest, labelMetrics.advanceWidth(names[id] ?? String(id)))
-+        return Math.max(Theme.workspaceCell, Math.ceil(widest) + 2 * Theme.sm)
++    // Each cell's width: a dot's, or with names, as wide as its own label. And
++    // where each one starts, for the accent pill.
++    readonly property var widths: ids.map(id => named
++        ? Math.max(Theme.workspaceCell, Math.ceil(labelMetrics.advanceWidth(names[id] ?? String(id))) + Theme.md)
++        : Theme.workspaceCell)
++    readonly property var offsets: {
++        let x = 0
++        return widths.map(w => {
++            const at = x
++            x += w
++            return at
++        })
 +    }
 +
      function switchTo(target) {
@@ -72,7 +79,7 @@ index 6d3f411..bceae54 100644
 +        if (next !== activeId) switchTo(next)
 +    }
 +
-+    implicitWidth: ids.length * cellWidth + 2 * Theme.xs
++    implicitWidth: widths.reduce((sum, w) => sum + w, 0) + 2 * Theme.xs
      implicitHeight: Theme.capsule
      radius: Theme.capsuleRadius
      color: Theme.surface
@@ -107,11 +114,17 @@ index 6d3f411..bceae54 100644
 +            }
 +        }
 +    }
-+    Component.onCompleted: rules.running = true
++    Component.onCompleted: {
++        rules.running = true
++        Hyprland.refreshWorkspaces()
++    }
 +    Connections {
 +        target: Hyprland
 +        function onRawEvent(event) {
 +            if (event.name === "configreloaded") rules.running = true
++            // Hyprland's count of each workspace's windows, kept current.
++            if (["openwindow", "closewindow", "movewindow", "movewindowv2"].includes(event.name))
++                Hyprland.refreshWorkspaces()
 +        }
 +    }
 +
@@ -124,31 +137,49 @@ index 6d3f411..bceae54 100644
              root.wheelDelta = 0
          }
      }
-@@ -43,15 +122,15 @@ Rectangle {
+ 
+     // Accent pill under the focused workspace. The edge facing the direction of travel
+     // moves first and the other edge catches up, so the pill stretches and then snaps.
++    // It follows the cell's place and its width, which change when the names arrive.
      Rectangle {
          id: indicator
  
 -        readonly property real target: Theme.xs + root.activeIndex * Theme.workspaceCell
-+        readonly property real target: Theme.xs + root.activeIndex * root.cellWidth
++        readonly property real targetStart: Theme.xs + (root.offsets[root.activeIndex] ?? 0)
++        readonly property real targetEnd: targetStart + (root.widths[root.activeIndex] ?? Theme.workspaceCell)
          property bool forward: true
-         property real start: target
+-        property real start: target
 -        property real end: target + Theme.workspaceCell
-+        property real end: target + root.cellWidth
++        property real start: targetStart
++        property real end: targetEnd
  
-         onTargetChanged: {
-             forward = target > start
-             start = target
+-        onTargetChanged: {
+-            forward = target > start
+-            start = target
 -            end = target + Theme.workspaceCell
-+            end = target + root.cellWidth
++        function follow() {
++            forward = targetStart > start
++            start = targetStart
++            end = targetEnd
          }
++        onTargetStartChanged: follow()
++        onTargetEndChanged: follow()
  
          x: start
-@@ -80,10 +159,11 @@ Rectangle {
+         width: end - start
+@@ -76,14 +172,17 @@ Rectangle {
+                 id: cell
+ 
+                 required property int modelData
++                required property int index
+                 readonly property var workspace: Hyprland.workspaces.values.find(w => w.id === modelData) ?? null
                  readonly property bool focused: root.activeId === modelData
-                 readonly property bool occupied: (workspace?.toplevels.values.length ?? 0) > 0
+-                readonly property bool occupied: (workspace?.toplevels.values.length ?? 0) > 0
++                readonly property bool occupied: (workspace?.lastIpcObject?.windows ?? 0) > 0
++                    || (workspace?.toplevels.values.length ?? 0) > 0
  
 -                width: Theme.workspaceCell
-+                width: root.cellWidth
++                width: root.widths[index] ?? Theme.workspaceCell
                  height: parent.height
  
                  Rectangle {
@@ -156,7 +187,7 @@ index 6d3f411..bceae54 100644
                      anchors.centerIn: parent
                      width: Theme.dotSize
                      height: Theme.dotSize
-@@ -94,6 +174,15 @@ Rectangle {
+@@ -94,6 +193,15 @@ Rectangle {
                      Behavior on scale { Anim {} }
                  }
  

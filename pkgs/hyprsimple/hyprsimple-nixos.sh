@@ -227,7 +227,13 @@ cmd_status() {
   echo "Provided by NixOS:  hyprsimple $provided ($src)"
   if [[ -d $HYPRSIMPLE_PATH ]]; then
     echo "Installed for $(id -un): hyprsimple $installed ($HYPRSIMPLE_PATH)"
-    if [[ -d $HYPRSIMPLE_PATH/.git ]] && [[ $(tree_of "$src") != "$(hgit rev-parse -q --verify 'HEAD^{tree}' 2>/dev/null)" ]]; then
+    if [[ -d $HYPRSIMPLE_PATH/.git && -n $(hgit status --porcelain 2>/dev/null) ]]; then
+      note "Files in $HYPRSIMPLE_PATH were changed by hand, so hyprsimple-update stops"
+      note "and new versions (and new features of hyprsimple-nix) do not reach you. To put"
+      note "the changes aside, keeping a copy:"
+      echo "  git -C $HYPRSIMPLE_PATH stash --include-untracked"
+      echo "Then run hyprsimple-update. Changes of your own belong in ~/.config/hypr."
+    elif [[ -d $HYPRSIMPLE_PATH/.git ]] && [[ $(tree_of "$src") != "$(hgit rev-parse -q --verify 'HEAD^{tree}' 2>/dev/null)" ]]; then
       note "Your copy differs from what NixOS provides. Run hyprsimple-update."
     fi
   else

@@ -10,6 +10,8 @@ let
     rev = "0b3920f9f97860fd04ca4db1497ab163f7c20bc4";
     hash = "sha256-HFj/f17B6c+g6rHNUU4owW27a7eUsDcw3sCcT0X803Y=";
   };
+  # For tests/pad.py, the pretend touchpad and mouse.
+  python = pkgs.python3.withPackages (ps: [ ps.evdev ]);
 in
 pkgs.testers.runNixOSTest {
   name = "hyprsimple";
@@ -34,6 +36,13 @@ pkgs.testers.runNixOSTest {
           workspaces = [ 2 ];
         };
         programs.hyprsimple.bar.position = "bottom";
+        programs.hyprsimple.workspaces.apps."8" = [ "mpv" ];
+        programs.hyprsimple.keys.workspaces11and12.enable = true;
+        programs.hyprsimple.keys.numpad.enable = true;
+        programs.hyprsimple.viewnior.enable = true;
+        programs.hyprsimple.viewniorKeys.enable = true;
+        # The unmended one as well, which the mended one has to win over.
+        environment.systemPackages = [ pkgs.viewnior ];
       };
       # hyprsimple ships setup for these two shells as well; test them too.
       programs.zsh.enable = true;
@@ -49,6 +58,8 @@ pkgs.testers.runNixOSTest {
 
       environment.etc."muslimtify-plugin".source = muslimtifyPlugin;
       environment.systemPackages = [ pkgs.wayland-utils ];
+      # For the pretend touchpad and mouse.
+      hardware.uinput.enable = true;
 
       virtualisation = {
         memorySize = 4096;
@@ -229,7 +240,7 @@ pkgs.testers.runNixOSTest {
               return user(f"sed -n 's/^Exec=\\([^ ]*\\).*/\\1/p' /run/current-system/sw/share/thumbnailers/{thumbnailer}.thumbnailer").strip()
           user(f"{exec_of('webp-pixbuf')} -s 128 \"$(find ~/.config/hypr/themes -name '*.webp' | head -n1)\" /tmp/webp.png && test -s /tmp/webp.png")
           user(f"{exec_of('gdk-pixbuf-thumbnailer')} -s 128 \"$(find ~/.config/hypr/themes -name '*.jpg' | head -n1)\" /tmp/jpg.png && test -s /tmp/jpg.png")
-          user("ffmpeg -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 /tmp/clip.mp4"
+          user("ffmpeg -nostdin -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 /tmp/clip.mp4"
                " && ffmpegthumbnailer -i /tmp/clip.mp4 -o /tmp/clip.png -s 128 && test -s /tmp/clip.png")
 
       with subtest("a Hyprland session through UWSM"):
@@ -325,12 +336,25 @@ pkgs.testers.runNixOSTest {
           user("test -s /tmp/screen.png")
 
       with subtest("switching theme at runtime"):
+          kvantum = "~/.config/Kvantum/kvantum.kvconfig"
+          # Qt programs go light and dark with the theme, as GTK ones do.
+          user("~/.local/bin/theme-switcher.sh catppuccin-latte")
+          user(f"grep -qx theme=KvGnome {kvantum}")
+          # A Kvantum theme of the user's own stays.
+          user(f"sed -i 's/^theme=.*/theme=KvArc/' {kvantum}")
+          user("~/.local/bin/theme-switcher.sh tokyo-night-day")
+          user(f"grep -qx theme=KvArc {kvantum}")
+          user(f"sed -i 's/^theme=.*/theme=KvGnome/' {kvantum}")
           user("~/.local/bin/theme-switcher.sh tokyo-night")
+          user(f"grep -qx theme=KvGnomeDark {kvantum}")
           user("readlink ~/.config/hypr/theme-active.lua | grep -q tokyo-night")
           errors = user("hyprctl configerrors 2>&1")
           assert errors.strip() in ("", "no errors"), errors
+          # A Qt program, in the dark theme's colours.
+          user("setsid -f uwsm app -- kvantummanager >/dev/null 2>&1 </dev/null")
           machine.sleep(5)
           machine.screenshot("tokyo-night")
+          user("pkill -x kvantummanager || true")
 
       with subtest("the bar loaded every module and image it asked for"):
           journal = user("journalctl --user -b --no-pager -o cat 2>&1")
@@ -489,6 +513,174 @@ pkgs.testers.runNixOSTest {
           machine.send_key("meta_l-q")
           wait_for("length", 0, workspace=7)
           machine.send_key("meta_l-1")
+
+      with subtest("an app opens on its own workspace"):
+          # mpv belongs on workspace 8. Started from workspace 1, it opens there.
+          user("setsid -f uwsm app -- mpv --idle=yes --force-window=yes >/dev/null 2>&1 </dev/null")
+          machine.wait_until_succeeds(
+              "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 clients -j'"
+              " | jq -e '[.[] | select(.class == \"mpv\")] | .[0].workspace.id == 8'",
+              timeout=60,
+          )
+          user("pkill -x mpv || true")
+          machine.send_key("meta_l-1")
+          # A workspace with a window shows it on the bar, from another one.
+          machine.send_key("meta_l-3")
+          terminal()
+          wait_for("length", 1, workspace=3)
+          machine.send_key("meta_l-1")
+          machine.sleep(2)
+          machine.screenshot("bar-workspace-with-windows")
+          machine.send_key("meta_l-3")
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=3)
+          machine.send_key("meta_l-1")
+
+      with subtest("keys for workspaces 11 and 12, and the number pad"):
+          def active():
+              return json.loads(user("hyprctl activeworkspace -j"))["id"]
+          def press(keys, workspace):
+              machine.send_key(keys)
+              eventually(lambda: active() == workspace, f"{keys} did not go to workspace {workspace}, but {active()}")
+          def existing():
+              return sorted(w["id"] for w in json.loads(user("hyprctl workspaces -j")) if w["id"] > 0)
+          def window():
+              return json.loads(user("hyprctl activewindow -j"))
+
+          press("meta_l-minus", 11)
+          press("meta_l-equal", 12)
+          terminal()
+          wait_for("length", 1, workspace=12)
+          press("meta_l-shift-minus", 11)
+          wait_for("length", 1, workspace=11)
+
+          # SHIFT + a number goes to that workspace, 5 and 0 back again.
+          press("shift-kp_3", 3)
+          terminal()
+          wait_for("length", 1, workspace=3)
+          press("kp_5", 11)
+          press("shift-kp_0", 10)
+          press("kp_0", 11)
+          # 8 and 2: the first and the last workspace there is.
+          press("kp_8", existing()[0])
+          press("kp_2", existing()[-1])
+          # 4 and 6: the workspace before and after.
+          here = active()
+          before = max(i for i in existing() if i < here)
+          press("kp_4", before)
+          press("kp_6", here)
+
+          # 7 and 9 move the window, 1 and 3 the focus.
+          terminal()
+          wait_for("length", 2, workspace=11)
+          new = window()
+          machine.send_key("kp_7")
+          eventually(lambda: window()["at"][0] < new["at"][0], "7 did not move the window left")
+          machine.send_key("kp_3")
+          eventually(lambda: window()["address"] != new["address"], "3 did not move the focus right")
+          machine.send_key("meta_l-q")
+          wait_for("length", 1, workspace=11)
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=11)
+          press("shift-kp_3", 3)
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=3)
+          press("shift-kp_1", 1)
+
+      with subtest("Viewnior zooms with a touchpad on Wayland, a wheel click is one step, and a zoomed photo drags"):
+          found = user("readlink -f $(command -v viewnior)").strip()
+          assert found != "${pkgs.viewnior}/bin/viewnior", "the unmended Viewnior comes first on PATH"
+          user("ffmpeg -nostdin -loglevel error -y -f lavfi -i testsrc=size=640x480 -frames:v 1 /tmp/picture.png")
+          def zoom():
+              title = user("hyprctl clients -j | jq -r '.[] | select(.class == \"viewnior\") | .title'").strip()
+              return int(title.rsplit(" - ", 1)[-1].rstrip("%")) if title else None
+          def viewnior():
+              user("systemd-run --user --unit=viewnior-test --collect viewnior /tmp/picture.png")
+              eventually(lambda: zoom() is not None, "no Viewnior window")
+              # The pointer in the middle of the screen, over the photo: the
+              # keys of the tests before moved it about.
+              user("hyprctl dispatch 'hl.dsp.cursor.move({ x = 640, y = 400 })'")
+              machine.sleep(2)
+              return zoom()
+          def pad(args):
+              machine.succeed("${python}/bin/python3 ${./pad.py} " + args)
+
+          # Alone on a workspace, Viewnior fills the screen, under the pointer.
+          # A wheel first: Hyprland 0.55 lost the very first scroll of a
+          # touchpad plugged in mid-session (a real one is there from boot).
+          press("meta_l-9", 9)
+          start = viewnior()
+          pad("wheel 1")
+          eventually(lambda: abs(zoom() - start * 1.1) <= 1,
+                     f"one wheel click is not one step: {start}% -> {zoom()}%, pointer at {user('hyprctl cursorpos').strip()}")
+
+          start = zoom()
+          pad("fingers 2 0 -120")
+          eventually(lambda: zoom() != start, f"two fingers did not zoom: {start}% -> {zoom()}%")
+
+          # Zoomed in further, the photo moves when it is dragged.
+          pad("wheel 20")
+          eventually(lambda: zoom() > 200, f"not zoomed in: {zoom()}%")
+          def photo_area():
+              return user("WAYLAND_DISPLAY=$(basename $(ls -d /run/user/1000/wayland-[0-9] | head -1))"
+                          " grim -g '200,200 400x300' - | md5sum").split()[0]
+          before = photo_area()
+          pad("drag -200 -120")
+          eventually(lambda: photo_area() != before, "a dragged photo did not move")
+          machine.screenshot("viewnior-zoomed")
+          user("systemctl --user stop viewnior-test")
+          press("meta_l-1", 1)
+
+      with subtest("swayimg and imv answer to Viewnior's keys"):
+          user("mkdir -p /tmp/photos"
+               " && ffmpeg -nostdin -loglevel error -y -f lavfi -i testsrc=size=640x480 -frames:v 1 /tmp/photos/a.png"
+               " && ffmpeg -nostdin -loglevel error -y -f lavfi -i smptebars=size=640x480 -frames:v 1 /tmp/photos/b.png")
+          def title(app):
+              return user(f"hyprctl clients -j | jq -r '.[] | select(.class == \"{app}\") | .title'").strip()
+          press("meta_l-9", 9)
+          for app, command in (("swayimg", "swayimg /tmp/photos/a.png"), ("imv", "imv-dir /tmp/photos/a.png")):
+              user(f"systemd-run --user --unit=photos --collect {command}")
+              eventually(lambda: "a.png" in title(app), f"{app} did not show a.png")
+              # The other photo in the folder came along: the keys go to it and back.
+              for keys, photo in (("spc", "b.png"), ("backspace", "a.png"), ("end", "b.png"), ("home", "a.png")):
+                  machine.send_key(keys)
+                  eventually(lambda: photo in title(app), f"{keys} in {app} did not show {photo}: {title(app)}")
+              before = photo_area()
+              machine.send_key("ctrl-r")
+              eventually(lambda: photo_area() != before, f"ctrl-r did not turn the photo in {app}")
+              machine.send_key("esc")
+              eventually(lambda: title(app) == "", f"esc did not close {app}")
+          press("meta_l-1", 1)
+
+      with subtest("the keys guide's examples load, and its swipe changes the workspace"):
+          guide = open("${../docs/keys.md}").read()
+          lua = "\n".join(re.findall(r"```lua\n(.*?)```", guide, re.S))
+          # And every action in its table, on keys of their own.
+          actions = re.findall(r"`(hl\.dsp\.[^`]+)`", guide)
+          for number, action in enumerate(actions, 1):
+              lua += f'\nhl.bind("SUPER + CTRL + ALT + SHIFT + code:{number + 9}", {action}, {{ description = "guide action {number}" }})'
+          lua += '\nhl.bind("SUPER + CTRL + ALT + SHIFT + F12", hl.dsp.no_op(), { description = "the keys guide loaded" })\n'
+          config = "/home/alice/.config/hypr/input.lua"
+          machine.succeed(f"cp {config} /tmp/input.lua.saved")
+          machine.succeed(f"cat >> {config} <<'GUIDE'\n{lua}\nGUIDE")
+          user("hyprctl reload")
+          errors = user("hyprctl configerrors 2>&1")
+          assert errors.strip() in ("", "no errors"), errors
+          binds = user("hyprctl binds -j")
+          for name in ("the keys guide loaded", "Notes", "Workspace Before", "Close Window", f"guide action {len(actions)}"):
+              assert name in binds, f"not bound: {name}"
+          for option, value in (("input:touchpad:tap-to-click", 1), ("input:accel_profile", "flat")):
+              got = json.loads(user(f"hyprctl getoption {option} -j"))
+              assert value in got.values(), f"{option}: {got}"
+
+          here = active()
+          pad("fingers 3 -400 0")
+          eventually(lambda: active() != here, "a 3-finger swipe did not change the workspace")
+          pad("fingers 3 400 0")
+          eventually(lambda: active() == here, "a 3-finger swipe back did not come back")
+
+          machine.succeed(f"cp /tmp/input.lua.saved {config}")
+          user("hyprctl reload")
 
       with subtest("the bar at the bottom, with its panels and notifications opening upwards"):
           machine.succeed("grep -q HYPRSIMPLE_BAR /etc/pam/environment")

@@ -7,4 +7,5 @@
   hyprqt6engine = pkgs.qt6Packages.callPackage ./hyprqt6engine/package.nix { };
   muslimtify = pkgs.callPackage ./muslimtify/package.nix { };
   quickshell = pkgs.callPackage ./quickshell/package.nix { };
+  viewnior = pkgs.callPackage ./viewnior/package.nix { };
 }

@@ -1,0 +1,219 @@
+diff --git a/src/uni-image-view.c b/src/uni-image-view.c
+index 25b4a0f..e48fc44 100755
+--- a/src/uni-image-view.c
++++ b/src/uni-image-view.c
+@@ -76,6 +76,10 @@ struct _UniImageViewPrivate
+    * driving the scrollable adjustment values */
+   GtkScrollablePolicy hscroll_policy : 1;
+   GtkScrollablePolicy vscroll_policy : 1;
++
++  /* Smooth scrolling not yet turned into wheel steps. */
++  gdouble scroll_dx;
++  gdouble scroll_dy;
+ };
+ 
+ static guint uni_image_view_signals[LAST_SIGNAL] = { 0 };
+@@ -498,6 +502,7 @@ uni_image_view_realize (GtkWidget * widget)
+     attrs.visual = gtk_widget_get_visual (widget);
+     attrs.event_mask = (gtk_widget_get_events (widget)
+                         | GDK_SCROLL_MASK
++                        | GDK_SMOOTH_SCROLL_MASK
+                         | GDK_EXPOSURE_MASK
+                         | GDK_BUTTON_MOTION_MASK
+                         | GDK_BUTTON_PRESS_MASK
+@@ -653,21 +658,22 @@ uni_image_view_vadj_changed_cb (GtkAdjustment * adj, UniImageView * view)
+     return FALSE;
+ }
+ 
+-static int
+-uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
++/* One step of the wheel, in a direction: what the preferences say the wheel
++ * does. */
++static void
++uni_image_view_scroll_step (UniImageView * view, VnrWindow * vnr_win,
++                            GdkScrollDirection direction,
++                            GdkModifierType state, gdouble x, gdouble y)
+ {
+     gdouble zoom;
+-    UniImageView *view = UNI_IMAGE_VIEW (widget);
+-    VnrWindow *vnr_win = VNR_WINDOW(gtk_widget_get_toplevel(widget));
+-    g_assert(gtk_widget_is_toplevel(GTK_WIDGET(vnr_win)));
+ 
+     /* Horizontal scroll left is equivalent to scroll up and right is
+      * like scroll down. No idea if that is correct -- I have no input
+      * device that can do horizontal scrolls. */
+     
+-	if (vnr_win->prefs->behavior_wheel == VNR_PREFS_WHEEL_ZOOM || (ev->state & GDK_CONTROL_MASK) != 0)
++	if (vnr_win->prefs->behavior_wheel == VNR_PREFS_WHEEL_ZOOM || (state & GDK_CONTROL_MASK) != 0)
+ 	{
+-        switch (ev->direction)
++        switch (direction)
+         {
+             case GDK_SCROLL_LEFT: 
+                 // In Zoom mode left/right scroll is used for navigation
+@@ -677,42 +683,42 @@ uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
+                 vnr_window_next(vnr_win, TRUE); 
+                 break;
+             case GDK_SCROLL_UP:
+-                if( ev->state & GDK_SHIFT_MASK ) {
++                if( state & GDK_SHIFT_MASK ) {
+                     vnr_window_prev(vnr_win);
+                 } else {
+                     zoom = CLAMP (view->zoom * UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                    uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                    uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 }
+                 break;
+             default:
+-                if( ev->state & GDK_SHIFT_MASK ) {
++                if( state & GDK_SHIFT_MASK ) {
+                     vnr_window_next(vnr_win, TRUE);
+                 } else {
+                     zoom = CLAMP (view->zoom / UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                    uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                    uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 }
+         }
+ 
+ 	}
+ 	else if(vnr_win->prefs->behavior_wheel == VNR_PREFS_WHEEL_NAVIGATE)
+ 	{
+-        switch (ev->direction)
++        switch (direction)
+         {
+             case GDK_SCROLL_LEFT:
+                 zoom = CLAMP (view->zoom * UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 break;
+ 
+             case GDK_SCROLL_RIGHT:
+                 zoom = CLAMP (view->zoom / UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 break;
+ 
+             case GDK_SCROLL_UP:
+-                if( ev->state & GDK_SHIFT_MASK )
++                if( state & GDK_SHIFT_MASK )
+                 {
+                     zoom = CLAMP (view->zoom * UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                    uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                    uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 }
+                 else
+                     vnr_window_prev(vnr_win);
+@@ -720,10 +726,10 @@ uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
+                 break;
+ 
+             default:
+-                if( ev->state & GDK_SHIFT_MASK )
++                if( state & GDK_SHIFT_MASK )
+                 {
+                     zoom = CLAMP (view->zoom / UNI_ZOOM_STEP, UNI_ZOOM_MIN, UNI_ZOOM_MAX);
+-                    uni_image_view_set_zoom_with_center (view, zoom, ev->x, ev->y, FALSE);
++                    uni_image_view_set_zoom_with_center (view, zoom, x, y, FALSE);
+                 }
+                 else
+                     vnr_window_next(vnr_win, TRUE);
+@@ -731,7 +737,7 @@ uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
+ 	}
+ 	else
+ 	{
+-		switch (ev->direction) 
++		switch (direction) 
+ 		{
+ 			case GDK_SCROLL_LEFT: 
+                 uni_image_view_scroll (view, GTK_SCROLL_PAGE_LEFT, GTK_SCROLL_NONE); 
+@@ -740,19 +746,89 @@ uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
+                 uni_image_view_scroll (view, GTK_SCROLL_PAGE_RIGHT, GTK_SCROLL_NONE);
+                 break;
+             case GDK_SCROLL_UP:
+-                if( ev->state & GDK_SHIFT_MASK )
++                if( state & GDK_SHIFT_MASK )
+                     uni_image_view_scroll (view, GTK_SCROLL_PAGE_LEFT, GTK_SCROLL_NONE);
+                 else
+                     uni_image_view_scroll (view, GTK_SCROLL_NONE, GTK_SCROLL_PAGE_UP);
+                 break;
+             default:
+-                if( ev->state & GDK_SHIFT_MASK )
++                if( state & GDK_SHIFT_MASK )
+                     uni_image_view_scroll (view, GTK_SCROLL_PAGE_RIGHT, GTK_SCROLL_NONE);
+                 else
+                     uni_image_view_scroll (view, GTK_SCROLL_NONE, GTK_SCROLL_PAGE_DOWN);
+ 		}
+ 	}
+ 
++}
++
++static int
++uni_image_view_scroll_event (GtkWidget * widget, GdkEventScroll * ev)
++{
++    UniImageView *view = UNI_IMAGE_VIEW (widget);
++    UniImageViewPrivate *priv = view->priv;
++    VnrWindow *vnr_win = VNR_WINDOW(gtk_widget_get_toplevel(widget));
++    GdkEvent *event = (GdkEvent *) ev;
++    GdkDevice *source;
++    gboolean wheel;
++    gdouble dx = 0, dy = 0;
++    g_assert(gtk_widget_is_toplevel(GTK_WIDGET(vnr_win)));
++
++    if (ev->direction != GDK_SCROLL_SMOOTH)
++    {
++        uni_image_view_scroll_step (view, vnr_win, ev->direction, ev->state, ev->x, ev->y);
++        return TRUE;
++    }
++
++    /* Smooth scrolling. On Wayland a touchpad only scrolls this way, so
++     * without it two fingers did nothing at all. Each whole unit is one
++     * step, as X11 counts a touchpad, and a mouse wheel's click is always
++     * one step, also where it measures 1.5 (Wayland). */
++    if (gdk_event_is_scroll_stop_event (event))
++    {
++        priv->scroll_dx = priv->scroll_dy = 0;
++        return TRUE;
++    }
++    if (!gdk_event_get_scroll_deltas (event, &dx, &dy))
++        return TRUE;
++    source = gdk_event_get_source_device (event);
++    wheel = source == NULL || gdk_device_get_source (source) == GDK_SOURCE_MOUSE;
++
++    /* Only along the way the fingers move most, so a little sideways wobble
++     * while zooming does not turn to the next image. */
++    if (fabs (dx) > fabs (dy))
++        priv->scroll_dx += dx;
++    else
++        priv->scroll_dy += dy;
++
++    while (fabs (priv->scroll_dy) >= 1.0)
++    {
++        gboolean down = priv->scroll_dy > 0;
++        uni_image_view_scroll_step (view, vnr_win,
++                                    down ? GDK_SCROLL_DOWN : GDK_SCROLL_UP,
++                                    ev->state, ev->x, ev->y);
++        priv->scroll_dx = 0;
++        if (wheel)
++        {
++            priv->scroll_dy = 0;
++            break;
++        }
++        priv->scroll_dy += down ? -1.0 : 1.0;
++    }
++    while (fabs (priv->scroll_dx) >= 1.0)
++    {
++        gboolean right = priv->scroll_dx > 0;
++        uni_image_view_scroll_step (view, vnr_win,
++                                    right ? GDK_SCROLL_RIGHT : GDK_SCROLL_LEFT,
++                                    ev->state, ev->x, ev->y);
++        priv->scroll_dy = 0;
++        if (wheel)
++        {
++            priv->scroll_dx = 0;
++            break;
++        }
++        priv->scroll_dx += right ? -1.0 : 1.0;
++    }
++
+     return TRUE;
+ }
+ 

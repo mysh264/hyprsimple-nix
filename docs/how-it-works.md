@@ -46,12 +46,20 @@ describes parts 1 and 2 the NixOS way:
 - the "Hyprsimple" login entry, when you ask for it
   (`programs.hyprsimple.loginEntry.enable`);
 - extras hyprsimple does not have (yet), off until you turn them on:
-  workspace names on the bar (`programs.hyprsimple.workspaces.names`), keys
+  workspace names on the bar (`programs.hyprsimple.workspaces.names`), apps
+  that open on their own workspace (`programs.hyprsimple.workspaces.apps`), keys
   for window groups (`programs.hyprsimple.groups.enable`), the i3 layout
   next to Hyprland's (`programs.hyprsimple.i3`, with the
   [hy3](https://github.com/outfoxxed/hy3) plugin, built for your Hyprland),
-  and the bar at the bottom (`programs.hyprsimple.bar.position`). The first
-  three are the Lua in [`modules/hyprland.lua`](../modules/hyprland.lua),
+  keys for workspaces 11 and 12 and for the number pad
+  (`programs.hyprsimple.keys`), the bar at the bottom
+  (`programs.hyprsimple.bar.position`), a mended Viewnior
+  (`programs.hyprsimple.viewnior.enable`, see below), and Viewnior's keys
+  for swayimg and imv (`programs.hyprsimple.viewniorKeys.enable`: the files
+  in [`modules/viewnior-keys`](../modules/viewnior-keys), written to
+  `/etc/xdg/swayimg` and `/etc/imv_config`; swayimg 5 takes Lua, swayimg 4
+  an INI file). The ones that change
+  Hyprland are the Lua in [`modules/hyprland.lua`](../modules/hyprland.lua),
   written with your settings to `/etc/hyprsimple/hyprland.lua`, which
   hyprsimple's own config loads.
 
@@ -76,7 +84,7 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Ten small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+- Eleven small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
   Numbers 1 to 4, 6 and 7 only do something when `/etc/hyprsimple` exists, so
   hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
@@ -98,12 +106,19 @@ NixOS:
      `/etc/hyprsimple/hyprland.lua`: after hyprsimple's defaults, before
      your own files, so your settings still win.
   8. The bar shows a workspace's name instead of its dot, when it has one,
-     and always shows workspaces that a rule names. Without names, it is the
-     bar as before.
+     in a cell as wide as the name, and always shows workspaces that a rule
+     names. It also asks Hyprland which workspaces have windows, as the
+     bar's own list missed some. Without names, it is the bar as before.
   9. The theme templates give window groups, and the tabs of the i3
      layout, the theme's colours. Without them, nobody sees these colours.
   10. The bar can sit at the bottom: then its panels, notifications and
      tooltips open upwards out of it. At the top, nothing changes.
+  11. The theme switcher makes Qt programs light or dark with the theme, as
+     it does GTK programs. hyprsimple makes Kvantum the style of Qt
+     programs, but gave Kvantum no theme, so they stayed light. Now they get
+     Kvantum's Adwaita (KvGnome, or KvGnomeDark for a dark theme), the twin
+     of the GTK theme. A Kvantum theme you chose yourself stays. This one
+     fixes a bug that also happens on Arch.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -167,6 +182,16 @@ hyprsimple-nix fixes both.
   it found a time zone in `/etc/zoneinfo` (where NixOS keeps them), but read
   its offset only from `/usr/share/zoneinfo`, so without `TZDIR` every zone
   was "UTC+0.0" and prayer times were hours off.
+- **Viewnior, mended** (with `programs.hyprsimple.viewnior.enable`):
+  nixpkgs' Viewnior, with two patches. Viewnior only read scrolling that
+  comes in clicks, like a mouse wheel's. On Wayland, GTK passes a touchpad's
+  scrolling on as smooth scrolling only, so two fingers neither zoomed nor
+  turned photos there. The first patch reads smooth scrolling too, and
+  turns it into the same steps: one per whole unit, as X11 counts a
+  touchpad, and exactly one per click of a wheel. And dragging a zoomed-in
+  photo, like the crop dialog's rectangle, drew straight onto the window,
+  outside GTK's drawing: that shows on X11 only, so on Wayland the photo
+  stood still. The second patch redraws both through GTK.
 - **Quickshell**, which draws the bar, comes from NixOS but is wrapped in
   two ways: it can show webp pictures (most wallpapers are webp), and it
   keeps the name `qs`, which hyprsimple uses to find its bar.
@@ -206,6 +231,10 @@ nix flake check   # the virtual machine test needs KVM
   that only that one closed; in the i3 layout, checks that one window fills
   the screen, that a second makes tabs, that the tabs split and come back,
   and that SUPER + CTRL + SPACE switches a workspace, also through a reload;
+  checks that an app opens on its own workspace; presses the keys for
+  workspaces 11 and 12 and every number pad key; zooms in Viewnior with a
+  pretend touchpad (and checks that a wheel click is one step); loads every
+  example in the [keys guide](keys.md) and swipes with three fingers;
   moves the bar to the bottom and opens a panel and a notification there; runs `hyprsimple-update`
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
@@ -249,7 +278,7 @@ checks. To finish it, or to do it by hand:
 | `modules/arch-packages.nix` | Arch package → NixOS package |
 | `pkgs/hyprsimple/` | hyprsimple for NixOS, its patches, and the `hyprsimple-*` tools |
 | `pkgs/hyprsimple/gpu/` | the pieces `hyprsimple-nixos gpu` builds `gpu.nix` from |
-| `pkgs/hyprqt6engine/`, `pkgs/muslimtify/`, `pkgs/quickshell/` | the extra packages |
+| `pkgs/hyprqt6engine/`, `pkgs/muslimtify/`, `pkgs/quickshell/`, `pkgs/viewnior/` | the extra packages |
 | `templates/default/` | a starting configuration for new machines |
 | `tests/` | all the checks above |
 | `docs/` | these guides |
