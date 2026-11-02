@@ -913,13 +913,22 @@ pkgs.testers.runNixOSTest {
           assert errors.strip() in ("", "no errors"), errors
 
       with subtest("the removal guide's commands work as written"):
-          # Run Part 1 of docs/uninstall.md exactly as a reader would.
+          # Run Part 1 of docs/uninstall.md exactly as a reader would. The
+          # remover asks first and wants a terminal for that: script gives it
+          # one, and the reader's yes.
           guide = open("${../docs/uninstall.md}").read()
           part1 = guide.split("## Part 1")[1].split("## Part 2")[0]
           blocks = re.findall(r"```sh\n(.*?)```", part1, re.S)
-          assert len(blocks) == 4, f"expected 4 command blocks in Part 1, found {len(blocks)}"
-          for block in blocks:
-              print(user(block + " 2>&1", check=False)[1])
+          assert blocks == ["hyprsimple-uninstall.sh\n", "uwsm stop\n"], f"Part 1 runs other commands now: {blocks}"
+          out = user("printf 'yes\\n' | script -qec hyprsimple-uninstall.sh /dev/null 2>&1", check=False)[1]
+          print(out)
+          assert "Done. Log out now" in out, "the remover did not finish"
+          assert "come from your NixOS configuration" in out and "uninstall.md#part-2-for-the-computer" in out, \
+              "the remover did not send the reader to Part 2 for the NixOS configuration"
+          print(user("uwsm stop 2>&1", check=False)[1])
+          # The checkout held nothing of the user's: it is gone, not moved away.
+          user("test ! -e ~/.local/share/hyprsimple.hyprsimple-removed")
+          user("test ! -e ~/.local/bin/hyprsimple-uninstall.sh")
           # The user's own settings are back where they were.
           user("grep -qx 'font-size = 13' ~/.config/ghostty/config")
           user("test -L ~/.config/yazi && test ! -e ~/.config/yazi.backup")

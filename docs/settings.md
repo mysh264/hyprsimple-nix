@@ -596,7 +596,7 @@ version from hyprsimple's `main` branch instead, save this as a new file,
 {
   programs.hyprsimple.package =
     options.programs.hyprsimple.package.default.overrideAttrs {
-      version = "0.4.8-unstable-2026-11-01";
+      version = "0.4.9-unstable-2026-11-03";
       src = pkgs.fetchFromGitHub {
         owner = "rizukirr";
         repo = "hyprsimple";

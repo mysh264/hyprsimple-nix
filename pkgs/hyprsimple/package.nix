@@ -21,13 +21,13 @@
 # files, the way hyprsimple expects them.
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "hyprsimple";
-  version = "0.4.8";
+  version = "0.4.9";
 
   src = fetchFromGitHub {
     owner = "rizukirr";
     repo = "hyprsimple";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-/dnsJANuYTFMmbozGwyy9YzdAI3hmtMjwIir/Kw7RnY=";
+    hash = "sha256-6PnzAX8rAlSJOSy6EJa7a4enGe3OV4Um0QgslO5uPIw=";
   };
 
   # Patches 1 to 4, 6 and 7 only add a branch taken when /etc/hyprsimple
@@ -71,6 +71,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # hyprpaper that is gone in the middle of answering, and the theme
     # switcher, which asks it for the new wallpaper, then never finished.
     ./patches/0012-hyprpaper-requests-time-limit.patch
+    # hyprsimple-uninstall.sh: on NixOS, the packages and system settings
+    # come from the NixOS configuration, and its report says so, pointing to
+    # Part 2 of the removal guide. The checkout has no remote there, so it
+    # counts as hyprsimple-nix's own when its commits are all
+    # hyprsimple-nix's. Work in git stash keeps it, here and on Arch.
+    ./patches/0013-nixos-uninstall.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a

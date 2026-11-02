@@ -1,7 +1,7 @@
-diff --git i/.local/bin/hypr-helpers.sh w/.local/bin/hypr-helpers.sh
+diff --git a/.local/bin/hypr-helpers.sh b/.local/bin/hypr-helpers.sh
 index 57225fe..30baed0 100644
---- i/.local/bin/hypr-helpers.sh
-+++ w/.local/bin/hypr-helpers.sh
+--- a/.local/bin/hypr-helpers.sh
++++ b/.local/bin/hypr-helpers.sh
 @@ -32,6 +32,19 @@ EOF
    fi
  }
@@ -40,10 +40,10 @@ index 57225fe..30baed0 100644
    while IFS= read -r line; do
      [[ $line == *": "* ]] || continue
      folder="${line#*: }"
-diff --git i/.local/bin/live-wallpaper-toggle.sh w/.local/bin/live-wallpaper-toggle.sh
+diff --git a/.local/bin/live-wallpaper-toggle.sh b/.local/bin/live-wallpaper-toggle.sh
 index 17d06e8..f103275 100755
---- i/.local/bin/live-wallpaper-toggle.sh
-+++ w/.local/bin/live-wallpaper-toggle.sh
+--- a/.local/bin/live-wallpaper-toggle.sh
++++ b/.local/bin/live-wallpaper-toggle.sh
 @@ -44,7 +44,7 @@ reload_hyprpaper() {
  
  turn_off() {

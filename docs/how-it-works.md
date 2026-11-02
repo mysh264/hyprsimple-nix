@@ -247,7 +247,8 @@ nix flake check   # the virtual machine test needs KVM
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the
-  [removal guide](uninstall.md) and checks that the old settings came back.
+  [removal guide](uninstall.md), answering hyprsimple's remover in a
+  terminal, and checks that the old settings came back.
 
 All of this runs on every change, on both NixOS 26.05 and nixos-unstable.
 
@@ -275,7 +276,10 @@ checks. To finish it, or to do it by hand:
    the home folder belongs in `cmd_install` in
    [`hyprsimple-nixos.sh`](../pkgs/hyprsimple/hyprsimple-nixos.sh). A new
    system step belongs in the module.
-5. Run the virtual machine test: `nix build -L .#checks.x86_64-linux.vm`.
+5. Look at the new scripts in hyprsimple's `.local/bin`. One that assumes
+   Arch (pacman, a path under `/usr`, a checkout with a remote) needs a NixOS
+   patch, as `hyprsimple-uninstall.sh` got (patch 0013).
+6. Run the virtual machine test: `nix build -L .#checks.x86_64-linux.vm`.
 
 ## Where things are
 

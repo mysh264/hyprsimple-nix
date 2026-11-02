@@ -252,7 +252,7 @@ hyprsimple-nixos status
 ```
 
 You should see `Provided by NixOS: hyprsimple` with a version number (like
-`0.4.8`), and `Not set up for <your name> yet`. Good: that is what step 4
+`0.4.9`), and `Not set up for <your name> yet`. Good: that is what step 4
 does.
 
 ❌ **Got an error?** Read the first line that says `error:`. Most often it is

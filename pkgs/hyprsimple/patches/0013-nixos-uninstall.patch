@@ -1,0 +1,81 @@
+diff --git a/.local/bin/hyprsimple-uninstall.sh b/.local/bin/hyprsimple-uninstall.sh
+index a03d35b..dfed652 100755
+--- a/.local/bin/hyprsimple-uninstall.sh
++++ b/.local/bin/hyprsimple-uninstall.sh
+@@ -67,12 +67,29 @@ if grep -qsF '# >>> hyprsimple nvidia >>>' "$CONFIG/uwsm/env"; then
+   has_nvidia_block=1
+ fi
+ 
++# On NixOS (hyprsimple-nix), the packages and the system settings come from
++# the NixOS configuration, and Part 2 of hyprsimple-nix's removal guide takes
++# them out. /etc/hyprsimple/source is the hyprsimple version it provides.
++NIXOS=""
++[[ -e /etc/hyprsimple/source ]] && NIXOS=1
++REMOVAL_GUIDE="https://github.com/mysh264/hyprsimple-nix/blob/main/docs/uninstall.md#part-2-for-the-computer"
++
+ # Whether the checkout holds anything that exists nowhere else. A checkout git
+ # cannot answer for counts as holding something.
+ checkout_is_disposable() {
+   local status unpushed
+   status=$(git -C "$CHECKOUT" status --porcelain 2>/dev/null) || return 1
+   [[ -z $status ]] || return 1
++  # Work put aside with git stash is in no commit, and would go with the
++  # checkout.
++  [[ -z $(git -C "$CHECKOUT" stash list 2>/dev/null) ]] || return 1
++  if [[ -n $NIXOS ]]; then
++    # On NixOS the checkout has no remote. Each of its commits is a version
++    # hyprsimple-nix copied in from the system, which it can do again; a commit
++    # by anyone else exists nowhere else.
++    [[ -z $(git -C "$CHECKOUT" log --format=%ae 2>/dev/null | grep -vx 'hyprsimple-nix@localhost') ]]
++    return
++  fi
+   unpushed=$(git -C "$CHECKOUT" rev-list HEAD --not --remotes --tags -1 2>/dev/null) || return 1
+   [[ -z $unpushed ]]
+ }
+@@ -243,11 +260,15 @@ remove_checkout() {
+ }
+ 
+ report() {
++  printf '\nLeft in place:\n'
++  if [[ -n $NIXOS ]]; then
++    printf '  - The packages and the system settings, which come from your NixOS configuration.\n'
++    printf '    Part 2 of the removal guide takes them out: %s\n' "$REMOVAL_GUIDE"
++  else
++    printf '  - Packages. Nothing records which ones hyprsimple installed.\n'
++    printf '  - System changes: NetworkManager and DNS setup, ufw rules, enabled system services and any NVIDIA udev rule. FAQ.md lists how to undo them.\n'
++  fi
+   cat <<REPORT
+-
+-Left in place:
+-  - Packages. Nothing records which ones hyprsimple installed.
+-  - System changes: NetworkManager and DNS setup, ufw rules, enabled system services and any NVIDIA udev rule. FAQ.md lists how to undo them.
+   - pipewire and hyprpolkitagent, which any desktop may need.
+   - Older backups named *.backup.<number>, under ~/.config and ~/.local/bin.
+   - Scripts from older hyprsimple versions in ~/.local/bin, which the checkout no longer names.
+@@ -258,7 +279,11 @@ REPORT
+     printf '\nThe NVIDIA settings hyprsimple wrote moved aside with ~/.config/uwsm. Your own Hyprland setup may need them.\n'
+   fi
+   if grep -qsE '^[[:space:]]*Session=hyprsimple' "$SDDM_ROOT/sddm.conf" "$SDDM_ROOT"/sddm.conf.d/*; then
+-    printf '\nSDDM is set to log in to the Hyprsimple entry automatically. Change Session= in %s before you log out.\n' "$SDDM_ROOT/sddm.conf"
++    if [[ -n $NIXOS ]]; then
++      printf '\nSDDM is set to log in to the Hyprsimple entry automatically. Change services.displayManager.defaultSession in your NixOS configuration, and rebuild, before you log out.\n'
++    else
++      printf '\nSDDM is set to log in to the Hyprsimple entry automatically. Change Session= in %s before you log out.\n' "$SDDM_ROOT/sddm.conf"
++    fi
+   fi
+ }
+ 
+@@ -274,7 +299,12 @@ for name in "${config_items[@]}" hyprsimple; do
+     printf '  - %s/%s\n' "$CONFIG" "$name"
+   fi
+ done
+-printf '\nPackages and system changes stay. Type yes to continue: '
++if [[ -n $NIXOS ]]; then
++  printf '\nYour NixOS configuration stays: Part 2 of the removal guide is for that.'
++else
++  printf '\nPackages and system changes stay.'
++fi
++printf ' Type yes to continue: '
+ read -r answer
+ if [[ $answer != yes ]]; then
+   printf 'Nothing was changed.\n'
