@@ -286,7 +286,7 @@ in
       default = { };
       example = lib.literalExpression ''
         {
-          "1" = [ "firefox" "brave" "zen" "chrome" "chromium" ];
+          "1" = [ "firefox" "brave" "chrome" "chromium" ];
           "6" = [ "mpv" ];
         }
       '';

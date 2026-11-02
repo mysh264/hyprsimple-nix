@@ -99,7 +99,7 @@ Good to know:
 
 ```nix
   programs.hyprsimple.workspaces.apps = {
-    "1" = [ "firefox" "brave" "zen" "chrome" "chromium" ];
+    "1" = [ "firefox" "brave" "chrome" "chromium" ];
     "2" = [ "claude" "cursor" ];
     "4" = [ "kate" "gedit" ];
     "6" = [ "mpv" ];
@@ -129,7 +129,10 @@ To see the class:
 
 > 💡 A part matches anything that contains it. `"steam"` also matches Steam's
 > games (their class starts with `steam_app_`), so they open on workspace 9
-> too. If a short name catches an app you did not mean, write more of it.
+> too. And a very short part can catch apps you did not mean: `"zen"`, for
+> the Zen browser, also catches `zenity`, the small dialog windows hyprsimple
+> shows. If that happens, write more of the class, as `hyprctl clients`
+> shows it.
 
 ### Keys for workspaces 11 and 12
 
