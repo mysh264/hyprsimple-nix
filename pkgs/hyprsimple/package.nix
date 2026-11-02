@@ -66,6 +66,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # programs do, through Kvantum's Adwaita (KvGnome and KvGnomeDark).
     # Before, Kvantum had no theme, and Qt programs stayed light.
     ./patches/0011-qt-follows-light-and-dark.patch
+    # hypr-helpers.sh, live-wallpaper-toggle.sh: a time limit on hyprctl's
+    # requests to hyprpaper. hyprctl waits forever for an answer from a
+    # hyprpaper that is gone in the middle of answering, and the theme
+    # switcher, which asks it for the new wallpaper, then never finished.
+    ./patches/0012-hyprpaper-requests-time-limit.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a

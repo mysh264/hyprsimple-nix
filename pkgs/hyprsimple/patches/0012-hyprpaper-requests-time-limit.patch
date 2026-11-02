@@ -1,0 +1,55 @@
+diff --git i/.local/bin/hypr-helpers.sh w/.local/bin/hypr-helpers.sh
+index 57225fe..30baed0 100644
+--- i/.local/bin/hypr-helpers.sh
++++ w/.local/bin/hypr-helpers.sh
+@@ -32,6 +32,19 @@ EOF
+   fi
+ }
+ 
++# hyprctl's hyprpaper requests have no time limit: when hyprpaper is gone
++# between taking a request and answering it, hyprctl waits for the answer
++# forever, at full speed. A crashing hyprpaper did that to a theme switch,
++# which then never finished. Three seconds is far more than an answer takes.
++# (timeout is coreutils', always there; only a test's PATH of stubs lacks it.)
++hyprpaper_ipc() {
++  if command -v timeout >/dev/null 2>&1; then
++    timeout 3 hyprctl hyprpaper "$@" 2>/dev/null
++  else
++    hyprctl hyprpaper "$@" 2>/dev/null
++  fi
++}
++
+ # Show a wallpaper now: one image, or a folder of them to cycle through.
+ #
+ # hyprpaper.conf is written by the caller first. It is what hyprpaper reads when
+@@ -68,7 +81,7 @@ show_wallpaper() {
+     fi
+   fi
+   if [[ -f $path ]] &&
+-    answer=$(hyprctl hyprpaper wallpaper ",$path,cover" 2>/dev/null) && [[ -z $answer ]]; then
++    answer=$(hyprpaper_ipc wallpaper ",$path,cover") && [[ -z $answer ]]; then
+     return 0
+   fi
+   restart_hyprpaper
+@@ -91,7 +104,7 @@ wallpaper_images() (
+ # sends the caller to a restart, the one thing that also starts it.
+ hyprpaper_cycling() {
+   local active line shown=() folder
+-  active=$(hyprctl hyprpaper listactive 2>/dev/null) || return 0
++  active=$(hyprpaper_ipc listactive) || return 0
+   while IFS= read -r line; do
+     [[ $line == *": "* ]] || continue
+     folder="${line#*: }"
+diff --git i/.local/bin/live-wallpaper-toggle.sh w/.local/bin/live-wallpaper-toggle.sh
+index 17d06e8..f103275 100755
+--- i/.local/bin/live-wallpaper-toggle.sh
++++ w/.local/bin/live-wallpaper-toggle.sh
+@@ -44,7 +44,7 @@ reload_hyprpaper() {
+ 
+ turn_off() {
+   # Try to get current wallpaper from hyprpaper IPC
+-  ACTIVE=$(hyprctl hyprpaper listactive 2>/dev/null | head -1)
++  ACTIVE=$(hyprpaper_ipc listactive | head -1)
+   # Parse: hyprpaper answers "monitor: /path/to/wallpaper". It was read here as
+   # "monitor = /path", so the strip matched nothing, the path kept its "eDP-1: "
+   # prefix, the -f check below rejected it, and every disable fell back to the
