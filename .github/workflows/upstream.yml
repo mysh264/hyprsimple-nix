@@ -52,12 +52,14 @@ jobs:
           {
             echo 'report<<EOF'
             for check in hyprsimple package-mapping scripts; do
-              if nix build -L ".#checks.x86_64-linux.$check" 2>build.log; then
+              # The log stays out of the checkout, or the pull request
+              # below commits it.
+              if nix build -L ".#checks.x86_64-linux.$check" 2>"$RUNNER_TEMP/build.log"; then
                 echo "- [x] \`$check\`"
               else
                 echo "- [ ] \`$check\` failed:"
                 echo '```'
-                tail -n 30 build.log
+                tail -n 30 "$RUNNER_TEMP/build.log"
                 echo '```'
               fi
             done
@@ -68,6 +70,7 @@ jobs:
         if: steps.find.outputs.newer == 'true'
         with:
           branch: upstream/hyprsimple-${{ steps.find.outputs.latest }}
+          add-paths: pkgs/hyprsimple/package.nix
           commit-message: "hyprsimple: ${{ steps.find.outputs.current }} -> ${{ steps.find.outputs.latest }}"
           title: "hyprsimple: ${{ steps.find.outputs.current }} -> ${{ steps.find.outputs.latest }}"
           body: |
@@ -78,4 +81,5 @@ jobs:
             Before merging:
             - [ ] Read the diff of `install.sh` for new per-user steps, and mirror them in `pkgs/hyprsimple/hyprsimple-nixos.sh`.
             - [ ] Map any new package in `modules/arch-packages.nix`.
+            - [ ] Look at new scripts in `.local/bin`. One that assumes Arch needs a NixOS patch, as `hyprsimple-uninstall.sh` got (patch 0013).
             - [ ] Run the VM test: `nix build -L .#checks.x86_64-linux.vm` (or run CI on this branch).
