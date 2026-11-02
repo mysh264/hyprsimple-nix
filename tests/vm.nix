@@ -644,7 +644,16 @@ pkgs.testers.runNixOSTest {
               # The other photo in the folder came along: the keys go to it and back.
               for keys, photo in (("spc", "b.png"), ("backspace", "a.png"), ("end", "b.png"), ("home", "a.png")):
                   machine.send_key(keys)
-                  eventually(lambda: photo in title(app), f"{keys} in {app} did not show {photo}: {title(app)}")
+                  # Once, on 26.05, imv let an End go by and stayed on a.png,
+                  # with nothing in its log. So a key that changed nothing in
+                  # 10 seconds is pressed once more. A key that is not bound
+                  # still fails.
+                  try:
+                      eventually(lambda: photo in title(app), "", timeout=10)
+                  except AssertionError:
+                      print(f"{keys} in {app}: nothing after 10 seconds, pressing it again")
+                      machine.send_key(keys)
+                      eventually(lambda: photo in title(app), f"{keys} in {app} did not show {photo}: {title(app)}")
               before = photo_area()
               machine.send_key("ctrl-r")
               eventually(lambda: photo_area() != before, f"ctrl-r did not turn the photo in {app}")
