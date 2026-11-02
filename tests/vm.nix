@@ -681,8 +681,8 @@ pkgs.testers.runNixOSTest {
           user("hyprctl reload")
 
       with subtest("the bar at the bottom, with its panels and notifications opening upwards"):
-          machine.succeed("grep -q 'HYPRSIMPLE_BAR DEFAULT=\"bottom' /etc/pam/environment")
-          machine.succeed("grep -q 'HYPRSIMPLE_BAR_WORKSPACE_WIDTH DEFAULT=\"65' /etc/pam/environment")
+          machine.succeed("grep -Eq 'HYPRSIMPLE_BAR +DEFAULT=\"bottom\"' /etc/pam/environment")
+          machine.succeed("grep -Eq 'HYPRSIMPLE_BAR_WORKSPACE_WIDTH +DEFAULT=\"65\"' /etc/pam/environment")
           # The setting reaches a new session. This one gets the bar restarted
           # with it, as a new login would start it.
           print(user("systemd-run --user --wait --collect --pipe --quiet -p KillMode=process"
