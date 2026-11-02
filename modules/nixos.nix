@@ -335,6 +335,18 @@ in
       };
     };
 
+    bar.workspaceWidth = lib.mkOption {
+      type = lib.types.nullOr lib.types.ints.positive;
+      default = null;
+      example = 65;
+      description = ''
+        The width of every workspace on the bar, in pixels: all the same.
+        Without it, a workspace with a name is as wide as its name, and one
+        without as wide as its dot. A name too long for the width ends in
+        "…". A change shows at the next login.
+      '';
+    };
+
     keys.workspaces11and12.enable = lib.mkEnableOption ''
       keys for workspaces 11 and 12, after SUPER + 1 to 0: SUPER + - goes to
       workspace 11 and SUPER + = to workspace 12, and with SHIFT they move the
@@ -538,6 +550,10 @@ in
     # on XDG_DATA_DIRS. Applications carry their own; the command does not.
     # Read by the bar (patch 0010).
     environment.sessionVariables.HYPRSIMPLE_BAR = lib.mkIf (cfg.bar.position == "bottom") "bottom";
+    # Read by the bar (patch 0008).
+    environment.sessionVariables.HYPRSIMPLE_BAR_WORKSPACE_WIDTH = lib.mkIf (
+      cfg.bar.workspaceWidth != null
+    ) (toString cfg.bar.workspaceWidth);
 
     environment.sessionVariables.XDG_DATA_DIRS = [
       "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}"

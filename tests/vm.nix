@@ -36,6 +36,7 @@ pkgs.testers.runNixOSTest {
           workspaces = [ 2 ];
         };
         programs.hyprsimple.bar.position = "bottom";
+        programs.hyprsimple.bar.workspaceWidth = 65;
         programs.hyprsimple.workspaces.apps."8" = [ "mpv" ];
         programs.hyprsimple.keys.workspaces11and12.enable = true;
         programs.hyprsimple.keys.numpad.enable = true;
@@ -680,11 +681,12 @@ pkgs.testers.runNixOSTest {
           user("hyprctl reload")
 
       with subtest("the bar at the bottom, with its panels and notifications opening upwards"):
-          machine.succeed("grep -q HYPRSIMPLE_BAR /etc/pam/environment")
+          machine.succeed("grep -q 'HYPRSIMPLE_BAR DEFAULT=\"bottom' /etc/pam/environment")
+          machine.succeed("grep -q 'HYPRSIMPLE_BAR_WORKSPACE_WIDTH DEFAULT=\"65' /etc/pam/environment")
           # The setting reaches a new session. This one gets the bar restarted
           # with it, as a new login would start it.
           print(user("systemd-run --user --wait --collect --pipe --quiet -p KillMode=process"
-                     " sh -c 'HYPRSIMPLE_BAR=bottom ~/.local/bin/hyprsimple-restart-bar.sh' 2>&1"))
+                     " sh -c 'HYPRSIMPLE_BAR=bottom HYPRSIMPLE_BAR_WORKSPACE_WIDTH=65 ~/.local/bin/hyprsimple-restart-bar.sh' 2>&1"))
           def bar_layer():
               for monitor in json.loads(user("hyprctl layers -j")).values():
                   for layers in monitor["levels"].values():

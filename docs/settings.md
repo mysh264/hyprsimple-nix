@@ -297,6 +297,24 @@ Wi-Fi and the others), the notifications and the little hints all open
 upwards out of it. To put it back at the top, write `"top"` instead, or take
 the line out, rebuild, and log out and in.
 
+### Every workspace the same width on the bar
+
+```nix
+  programs.hyprsimple.bar.workspaceWidth = 65;
+```
+
+With [names](#name-your-workspaces), each workspace on the bar is as wide
+as its name: "Web" is small, "Theater" is wide. This line makes them all the
+same width, here 65 pixels, so they stand in neat, even boxes. A name too
+long for its box ends in "…".
+
+1. Add the line to `configuration.nix`. Pick your own number: bigger
+   numbers make wider boxes.
+2. Rebuild.
+3. Log out and back in. (The bar reads this setting when you log in.)
+
+Too small, or too wide? Change the number, rebuild, and log in again.
+
 ### Prayer times on the bar
 
 hyprsimple shows prayer times on the bar, through a plugin called

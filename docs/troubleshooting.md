@@ -16,6 +16,7 @@ do.
 [No bar at the top](#no-bar-at-the-top) ·
 [No wallpaper, or no password window](#no-wallpaper-or-no-password-window) ·
 [A new setting does not show](#a-new-setting-does-not-show) ·
+[The bar lost its names, is small, or is back at the top](#the-bar-lost-its-names-is-small-or-is-back-at-the-top) ·
 [A key, button or swipe of mine does nothing](#a-key-button-or-swipe-of-mine-does-nothing) ·
 [Viewnior does not zoom, or a zoomed photo does not move](#viewnior-does-not-zoom-or-a-zoomed-photo-does-not-move) ·
 [Qt programs do not change with the theme](#qt-programs-do-not-change-with-the-theme) ·
@@ -169,6 +170,40 @@ names, ...) and rebuilt, but your desktop still looks the same.
 Changes of your own belong in `~/.config/hypr`, never in
 `~/.local/share/hyprsimple`: see
 [Your desktop's own settings](settings.md#your-desktops-own-settings).
+
+## The bar lost its names, is small, or is back at the top
+
+This happens after you put your own changes aside (`git stash`, as in
+[A new setting does not show](#a-new-setting-does-not-show)) and ran
+`hyprsimple-update`. If you had changed hyprsimple's own files to name your
+workspaces, size them or move the bar, those changes are now set aside, so
+the bar is hyprsimple's again: small dots, at the top.
+
+The same things are settings in your NixOS configuration now. There, no
+update ever undoes them:
+
+1. Open your configuration: `sudo nano /etc/nixos/configuration.nix`
+2. Add these lines above the last `}`, with your own names:
+   ```nix
+     programs.hyprsimple.workspaces.names = [ "Web" "Code" "Term" "Edit" "Files" ];
+     programs.hyprsimple.bar.position = "bottom";
+     programs.hyprsimple.bar.workspaceWidth = 65;
+   ```
+   (Leave out the lines you do not want: names, the bar at the bottom, and
+   every workspace the same width.)
+3. Rebuild with the newest hyprsimple-nix, as in
+   [the update guide](update.md). In the classic setup, that is:
+   ```sh
+   sudo nixos-rebuild switch --option tarball-ttl 0
+   ```
+   Without `--option tarball-ttl 0`, NixOS may use the copy of hyprsimple-nix
+   it downloaded in the last hour, which may not know the new settings yet.
+4. Type `hyprsimple-update`.
+5. Log out and back in.
+
+Your old changes are not lost. `git -C ~/.local/share/hyprsimple stash show -p`
+shows them. Once you are happy without them,
+`git -C ~/.local/share/hyprsimple stash drop` throws them away.
 
 ## A key, button or swipe of mine does nothing
 

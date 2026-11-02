@@ -106,8 +106,9 @@ NixOS:
      `/etc/hyprsimple/hyprland.lua`: after hyprsimple's defaults, before
      your own files, so your settings still win.
   8. The bar shows a workspace's name instead of its dot, when it has one,
-     in a cell as wide as the name, and always shows workspaces that a rule
-     names. It also asks Hyprland which workspaces have windows, as the
+     in a cell as wide as the name (or as wide as
+     `programs.hyprsimple.bar.workspaceWidth` says, the same for all), and
+     always shows workspaces that a rule names. It also asks Hyprland which workspaces have windows, as the
      bar's own list missed some. Without names, it is the bar as before.
   9. The theme templates give window groups, and the tabs of the i3
      layout, the theme's colours. Without them, nobody sees these colours.

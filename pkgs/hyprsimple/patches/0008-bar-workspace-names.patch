@@ -1,9 +1,10 @@
 diff --git a/default/quickshell/bar/Workspaces.qml b/default/quickshell/bar/Workspaces.qml
-index 6d3f411..8c7d52a 100644
+index 6d3f411..82a3676 100644
 --- a/default/quickshell/bar/Workspaces.qml
 +++ b/default/quickshell/bar/Workspaces.qml
-@@ -1,58 +1,154 @@
+@@ -1,58 +1,158 @@
  import QtQuick
++import Quickshell
  import Quickshell.Hyprland
 +import Quickshell.Io
  import qs.theme
@@ -17,7 +18,9 @@ index 6d3f411..8c7d52a 100644
 +// shown, also while it is empty. Names come from Hyprland: a rule's
 +// default_name, or a name given at runtime. Without any names this is the
 +// capsule above. Whether a workspace has windows comes from Hyprland's own
-+// count as well: Quickshell's list of windows missed some.
++// count as well: Quickshell's list of windows missed some. With
++// HYPRSIMPLE_BAR_WORKSPACE_WIDTH set (programs.hyprsimple.bar.workspaceWidth),
++// every cell is that many pixels wide, and a longer name is cut short.
  Rectangle {
      id: root
  
@@ -50,8 +53,9 @@ index 6d3f411..8c7d52a 100644
  
 +    // Each cell's width: a dot's, or with names, as wide as its own label. And
 +    // where each one starts, for the accent pill.
-+    readonly property var widths: ids.map(id => named
-+        ? Math.max(Theme.workspaceCell, Math.ceil(labelMetrics.advanceWidth(names[id] ?? String(id))) + Theme.md)
++    readonly property int fixedWidth: parseInt(Quickshell.env("HYPRSIMPLE_BAR_WORKSPACE_WIDTH")) || 0
++    readonly property var widths: ids.map(id => fixedWidth > 0 ? fixedWidth
++        : named ? Math.max(Theme.workspaceCell, Math.ceil(labelMetrics.advanceWidth(names[id] ?? String(id))) + Theme.md)
 +        : Theme.workspaceCell)
 +    readonly property var offsets: {
 +        let x = 0
@@ -167,7 +171,7 @@ index 6d3f411..8c7d52a 100644
  
          x: start
          width: end - start
-@@ -76,14 +172,17 @@ Rectangle {
+@@ -76,14 +176,17 @@ Rectangle {
                  id: cell
  
                  required property int modelData
@@ -187,7 +191,7 @@ index 6d3f411..8c7d52a 100644
                      anchors.centerIn: parent
                      width: Theme.dotSize
                      height: Theme.dotSize
-@@ -94,6 +193,15 @@ Rectangle {
+@@ -94,6 +197,18 @@ Rectangle {
                      Behavior on scale { Anim {} }
                  }
  
@@ -195,6 +199,9 @@ index 6d3f411..8c7d52a 100644
 +                StyledText {
 +                    visible: root.named
 +                    anchors.centerIn: parent
++                    // In a fixed width, a name too long for it ends in "…".
++                    width: root.fixedWidth > 0 ? Math.min(implicitWidth, cell.width - Theme.xs * 2) : implicitWidth
++                    elide: Text.ElideRight
 +                    text: root.names[cell.modelData] ?? String(cell.modelData)
 +                    color: cell.focused ? Theme.onAccent : cell.occupied ? Theme.fg : Theme.muted
 +                    font.bold: cell.focused
