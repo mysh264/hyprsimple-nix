@@ -68,49 +68,93 @@ local function describe(normal, i3)
   return normal
 end
 
+-- ---- The jobs of the keys, by name ------------------------------------------
+
+-- Every key below does one of these jobs. They are here by name so that your
+-- own keys can do them too, in ~/.config/hypr/bindings/applications.lua:
+--
+--   hl.unbind("SUPER + CTRL + SPACE")
+--   hl.bind("SUPER + A", hyprsimple_nix.jobs.switch_layout, { description = "Hyprland / i3 Layout" })
+--
+-- (docs/keys.md lists them.) Each one is here whatever your settings, so a
+-- key of yours never stops your file from loading: a job for something that
+-- is off does nothing, or what it does on a workspace in Hyprland's layout.
+local jobs = {}
+hyprsimple_nix = { jobs = jobs }
+local groups = nix.groups
+
+local function nothing() end
+
+-- The first or the last workspace there is now.
+local function edge(last)
+  return function()
+    local found
+    for _, workspace in ipairs(hl.get_workspaces()) do
+      local id = workspace.id
+      if not workspace.special and id > 0 and (found == nil or (last and id > found) or (not last and id < found)) then
+        found = id
+      end
+    end
+    if found then
+      hl.dispatch(hl.dsp.focus({ workspace = tostring(found) }))
+    end
+  end
+end
+
+jobs.group = either(groups and hl.dsp.group.toggle(), hy3 and hy3.change_group("toggletab"))
+jobs.leave_group = groups and hl.dsp.window.move({ out_of_group = true }) or nothing
+for _, way in ipairs({ { "left", "l" }, { "right", "r" }, { "up", "u" }, { "down", "d" } }) do
+  local name, direction = way[1], way[2]
+  jobs["focus_" .. name] = either(hl.dsp.focus({ direction = direction }), hy3 and hy3.move_focus(direction))
+  jobs["move_" .. name] = either(hl.dsp.window.move({ direction = direction }), hy3 and hy3.move_window(direction))
+  jobs["into_group_" .. name] =
+    either(groups and hl.dsp.window.move({ into_group = direction }), hy3 and hy3.move_window(direction))
+end
+jobs.next_tab = either(groups and hl.dsp.group.next(), hy3 and hy3.focus_tab({ direction = "r", wrap = true }))
+jobs.previous_tab = either(groups and hl.dsp.group.prev(), hy3 and hy3.focus_tab({ direction = "l", wrap = true }))
+for index = 1, 9 do
+  jobs["tab_" .. index] =
+    either(groups and hl.dsp.group.active({ index = index }), hy3 and hy3.focus_tab({ index = index }))
+end
+-- Set with the i3 layout, below.
+jobs.switch_layout = nothing
+jobs.next_beside = either(nil, hy3 and hy3.make_group("h"))
+jobs.next_below = either(nil, hy3 and hy3.make_group("v"))
+jobs.turn_split = either(nil, hy3 and hy3.change_group("opposite"))
+jobs.first_workspace = edge(false)
+jobs.last_workspace = edge(true)
+
 -- ---- Groups and tabs --------------------------------------------------------
 
 -- Hyprland's window groups, and on an i3 workspace the same keys for its tabs.
-if nix.groups or hy3 then
-  local groups = nix.groups
-
-  bind(
-    "SUPER + G",
-    either(groups and hl.dsp.group.toggle(), hy3 and hy3.change_group("toggletab")),
-    describe("Group Windows / Ungroup", "Tabs / Split")
-  )
+if groups or hy3 then
+  bind("SUPER + G", jobs.group, describe("Group Windows / Ungroup", "Tabs / Split"))
   if groups then
-    bind("SUPER + ALT + G", hl.dsp.window.move({ out_of_group = true }), "Take Window out of Group")
+    bind("SUPER + ALT + G", jobs.leave_group, "Take Window out of Group")
   end
   for _, way in ipairs({
-    { "LEFT", "l", "Left" },
-    { "RIGHT", "r", "Right" },
-    { "UP", "u", "Up" },
-    { "DOWN", "d", "Down" },
-    { "H", "l", "Left" },
-    { "L", "r", "Right" },
-    { "K", "u", "Up" },
-    { "J", "d", "Down" },
+    { "LEFT", "left", "Left" },
+    { "RIGHT", "right", "Right" },
+    { "UP", "up", "Up" },
+    { "DOWN", "down", "Down" },
+    { "H", "left", "Left" },
+    { "L", "right", "Right" },
+    { "K", "up", "Up" },
+    { "J", "down", "Down" },
   }) do
     bind(
       "SUPER + ALT + " .. way[1],
-      either(groups and hl.dsp.window.move({ into_group = way[2] }), hy3 and hy3.move_window(way[2])),
+      jobs["into_group_" .. way[2]],
       describe("Move Window into Group " .. way[3], "Move Window " .. way[3])
     )
   end
 
-  local next_one = either(groups and hl.dsp.group.next(), hy3 and hy3.focus_tab({ direction = "r", wrap = true }))
-  local previous = either(groups and hl.dsp.group.prev(), hy3 and hy3.focus_tab({ direction = "l", wrap = true }))
-  bind("SUPER + ALT + TAB", next_one, describe("Next Window in Group", "Next Tab"))
-  bind("SUPER + ALT + SHIFT + TAB", previous, describe("Previous Window in Group", "Previous Tab"))
-  bind("SUPER + ALT + mouse_down", next_one, describe("Next Window in Group", "Next Tab"))
-  bind("SUPER + ALT + mouse_up", previous, describe("Previous Window in Group", "Previous Tab"))
+  bind("SUPER + ALT + TAB", jobs.next_tab, describe("Next Window in Group", "Next Tab"))
+  bind("SUPER + ALT + SHIFT + TAB", jobs.previous_tab, describe("Previous Window in Group", "Previous Tab"))
+  bind("SUPER + ALT + mouse_down", jobs.next_tab, describe("Next Window in Group", "Next Tab"))
+  bind("SUPER + ALT + mouse_up", jobs.previous_tab, describe("Previous Window in Group", "Previous Tab"))
   for index = 1, 9 do
-    bind(
-      "SUPER + ALT + " .. index,
-      either(groups and hl.dsp.group.active({ index = index }), hy3 and hy3.focus_tab({ index = index })),
-      describe("Window " .. index .. " in Group", "Tab " .. index)
-    )
+    bind("SUPER + ALT + " .. index, jobs["tab_" .. index], describe("Window " .. index .. " in Group", "Tab " .. index))
   end
 end
 
@@ -270,7 +314,7 @@ if hy3 then
     end
   end)
 
-  bind("SUPER + CTRL + SPACE", function()
+  jobs.switch_layout = function()
     local workspace = hl.get_active_workspace()
     if not workspace or workspace.special then
       return
@@ -281,21 +325,18 @@ if hy3 then
     if i3[workspace.id] and tiled(workspace.id) == 2 then
       hl.dispatch(hy3.change_group("tab"))
     end
-  end, "Switch This Workspace: Hyprland / i3 Layout")
+  end
+  bind("SUPER + CTRL + SPACE", jobs.switch_layout, "Switch This Workspace: Hyprland / i3 Layout")
 
   -- Splits, as in i3.
-  bind("SUPER + CTRL + H", either(nil, hy3.make_group("h")), "i3 Layout: Next Window Beside")
-  bind("SUPER + CTRL + J", either(nil, hy3.make_group("v")), "i3 Layout: Next Window Below")
-  bind("SUPER + CTRL + E", either(nil, hy3.change_group("opposite")), "i3 Layout: Turn the Split")
+  bind("SUPER + CTRL + H", jobs.next_beside, "i3 Layout: Next Window Beside")
+  bind("SUPER + CTRL + J", jobs.next_below, "i3 Layout: Next Window Below")
+  bind("SUPER + CTRL + E", jobs.turn_split, "i3 Layout: Turn the Split")
 
   -- Moving the focus goes through tabs and splits on an i3 workspace.
-  for _, way in ipairs({ { "H", "l", "Left" }, { "J", "d", "Down" }, { "K", "u", "Up" }, { "L", "r", "Right" } }) do
+  for _, way in ipairs({ { "H", "left", "Left" }, { "J", "down", "Down" }, { "K", "up", "Up" }, { "L", "right", "Right" } }) do
     hl.unbind("SUPER + " .. way[1])
-    bind(
-      "SUPER + " .. way[1],
-      either(hl.dsp.focus({ direction = way[2] }), hy3.move_focus(way[2])),
-      "Focus " .. way[3]
-    )
+    bind("SUPER + " .. way[1], jobs["focus_" .. way[2]], "Focus " .. way[3])
   end
 end
 
@@ -322,32 +363,16 @@ if nix.numpad then
     return "code:" .. pad[number]
   end
 
-  -- The first or the last workspace there is now.
-  local function edge(last)
-    return function()
-      local found
-      for _, workspace in ipairs(hl.get_workspaces()) do
-        local id = workspace.id
-        if not workspace.special and id > 0 and (found == nil or (last and id > found) or (not last and id < found)) then
-          found = id
-        end
-      end
-      if found then
-        hl.dispatch(hl.dsp.focus({ workspace = tostring(found) }))
-      end
-    end
-  end
-
   bind(key(4), hl.dsp.focus({ workspace = "e-1" }), "Workspace Before")
   bind(key(6), hl.dsp.focus({ workspace = "e+1" }), "Workspace After")
-  bind(key(8), edge(false), "First Workspace")
-  bind(key(2), edge(true), "Last Workspace")
+  bind(key(8), jobs.first_workspace, "First Workspace")
+  bind(key(2), jobs.last_workspace, "Last Workspace")
   bind(key(5), hl.dsp.focus({ workspace = "previous" }), "Back to the Workspace Before")
   bind(key(0), hl.dsp.focus({ workspace = "previous" }), "Back to the Workspace Before")
-  bind(key(1), either(hl.dsp.focus({ direction = "l" }), hy3 and hy3.move_focus("l")), "Focus Left")
-  bind(key(3), either(hl.dsp.focus({ direction = "r" }), hy3 and hy3.move_focus("r")), "Focus Right")
-  bind(key(7), either(hl.dsp.window.move({ direction = "l" }), hy3 and hy3.move_window("l")), "Move Window Left")
-  bind(key(9), either(hl.dsp.window.move({ direction = "r" }), hy3 and hy3.move_window("r")), "Move Window Right")
+  bind(key(1), jobs.focus_left, "Focus Left")
+  bind(key(3), jobs.focus_right, "Focus Right")
+  bind(key(7), jobs.move_left, "Move Window Left")
+  bind(key(9), jobs.move_right, "Move Window Right")
   for number = 0, 9 do
     local workspace = tostring(number == 0 and 10 or number)
     bind("SHIFT + " .. key(number), hl.dsp.focus({ workspace = workspace }), "Workspace " .. workspace)

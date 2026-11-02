@@ -661,6 +661,47 @@ pkgs.testers.runNixOSTest {
               eventually(lambda: title(app) == "", f"esc did not close {app}")
           press("meta_l-1", 1)
 
+      with subtest("Every shortcut (docs/shortcuts.md) lists the keys there are, and only those"):
+          page = open("${../docs/shortcuts.md}").read()
+          held = {"SUPER": 64, "CTRL": 4, "ALT": 8, "SHIFT": 1}
+          names = {"→": "right", "←": "left", "↑": "up", "↓": "down", "ESC": "escape", "/": "slash",
+                   "left button, drag": "mouse:272", "right button, drag": "mouse:273",
+                   "wheel down": "mouse_down", "wheel up": "mouse_up",
+                   "Volume Up key": "XF86AudioRaiseVolume", "Volume Down key": "XF86AudioLowerVolume",
+                   "Mute key": "XF86AudioMute", "Microphone Mute key": "XF86AudioMicMute",
+                   "Play key": "XF86AudioPlay", "Pause key": "XF86AudioPause",
+                   "Next key": "XF86AudioNext", "Previous key": "XF86AudioPrev",
+                   "Brightness Up key": "XF86MonBrightnessUp", "Brightness Down key": "XF86MonBrightnessDown",
+                   "Keyboard Light Up key": "XF86KbdBrightnessUp", "Keyboard Light Down key": "XF86KbdBrightnessDown"}
+          codes = {"-": 20, "=": 21, "Numpad 0": 90, "Numpad 1": 87, "Numpad 2": 88, "Numpad 3": 89,
+                   "Numpad 4": 83, "Numpad 5": 84, "Numpad 6": 85, "Numpad 7": 79, "Numpad 8": 80, "Numpad 9": 81}
+          documented = set()
+          for part in page.split("\n## ")[1:]:
+              # The bar, the touchpad and the photo viewers are not Hyprland's keys.
+              if part.split("\n", 1)[0] in ("The mouse on the bar", "The touchpad", "Photo viewers"):
+                  continue
+              for keys in re.findall(r"^\| \*\*(.+?)\*\* \|", part, re.M):
+                  *mods, last = keys.split(" + ")
+                  mask = sum(held[mod] for mod in mods)
+                  if last in codes:
+                      documented.add((mask, "", codes[last]))
+                  else:
+                      documented.add((mask, names.get(last, last).lower(), 0))
+          bound = [(b["modmask"], "" if b["keycode"] else b["key"].lower(), b["keycode"])
+                   for b in json.loads(user("hyprctl binds -j"))]
+          # NixOS 26.05's Hyprland lists a key named by its place (code:) with
+          # neither its name nor its code. Those keys are counted instead, for
+          # each set of held keys.
+          import collections
+          unnamed = collections.Counter(mask for mask, key, code in bound if not key and not code)
+          if unnamed:
+              by_place = collections.Counter(mask for mask, key, code in documented if code)
+              assert unnamed == by_place, f"keys by place: bound {dict(unnamed)}, on the page {dict(by_place)}"
+              documented = {entry for entry in documented if not entry[2]}
+          named = {entry for entry in bound if entry[1] or entry[2]}
+          assert documented == named, (f"bound, but not on the page: {sorted(named - documented)}; "
+                                       f"on the page, but not bound: {sorted(documented - named)}")
+
       with subtest("the keys guide's examples load, and its swipe changes the workspace"):
           guide = open("${../docs/keys.md}").read()
           lua = "\n".join(re.findall(r"```lua\n(.*?)```", guide, re.S))
@@ -687,6 +728,61 @@ pkgs.testers.runNixOSTest {
           eventually(lambda: active() != here, "a 3-finger swipe did not change the workspace")
           pad("fingers 3 400 0")
           eventually(lambda: active() == here, "a 3-finger swipe back did not come back")
+
+          # The whole layout at the end of the guide: its keys are there, and
+          # they do their jobs.
+          for name in ("Show / Hide the Scratchpad", "Window into / out of the Scratchpad", "Drop-down Terminal",
+                       "Next Workspace", "Screenshot of the Window", "Back to the Workspace Before"):
+              assert name in binds, f"not bound: {name}"
+          # SUPER + A switches the layout, through hyprsimple_nix.jobs, and back.
+          state = "/run/user/1000/hyprsimple-nix-i3-workspaces"
+          def layout_of(workspace):
+              lines = machine.succeed(f"cat {state} 2>/dev/null || true").splitlines()
+              return "i3" if f"{workspace} i3" in lines else "hyprland"
+          here = active()
+          before = layout_of(here)
+          machine.send_key("meta_l-a")
+          eventually(lambda: layout_of(here) != before, "SUPER + A did not switch the layout")
+          machine.send_key("meta_l-a")
+          eventually(lambda: layout_of(here) == before, "SUPER + A did not switch the layout back")
+          # SUPER + the workspace you are on goes back to the one before.
+          if active() == 3:
+              machine.send_key("meta_l-4")
+              eventually(lambda: active() == 4, "SUPER + 4 did not go to workspace 4")
+          machine.send_key("meta_l-3")
+          eventually(lambda: active() == 3, "SUPER + 3 did not go to workspace 3")
+          machine.send_key("meta_l-4")
+          eventually(lambda: active() == 4, "SUPER + 4 did not go to workspace 4")
+          machine.send_key("meta_l-4")
+          eventually(lambda: active() == 3, f"SUPER + 4 on workspace 4 went to {active()}, not back to 3")
+          # SUPER + TAB: the next workspace there is, and after the last, the first.
+          ids = sorted(w["id"] for w in json.loads(user("hyprctl workspaces -j")) if w["id"] > 0)
+          after = ids[(ids.index(active()) + 1) % len(ids)]
+          machine.send_key("meta_l-tab")
+          eventually(lambda: active() == after, f"SUPER + TAB went to {active()}, not {after}")
+          # SUPER + SHIFT + S hides a window in the scratchpad, SUPER + S shows
+          # it, and SUPER + SHIFT + S again takes it back out.
+          def place(address):
+              for client in json.loads(user("hyprctl clients -j")):
+                  if client["address"] == address:
+                      return client["workspace"]["name"]
+          def shown():
+              return json.loads(user("hyprctl monitors -j"))[0]["specialWorkspace"]["name"]
+          machine.send_key("meta_l-9")
+          eventually(lambda: active() == 9, "SUPER + 9 did not go to workspace 9")
+          terminal()
+          wait_for("length", 1, workspace=9)
+          address = json.loads(user("hyprctl activewindow -j"))["address"]
+          machine.send_key("meta_l-shift-s")
+          eventually(lambda: place(address) == "special:magic", f"SUPER + SHIFT + S left the window on {place(address)}")
+          assert shown() == "", "the scratchpad came up with the window"
+          machine.send_key("meta_l-s")
+          eventually(lambda: shown() == "special:magic", "SUPER + S did not show the scratchpad")
+          machine.send_key("meta_l-shift-s")
+          eventually(lambda: place(address) == "9", f"SUPER + SHIFT + S left the window on {place(address)}")
+          eventually(lambda: shown() == "", "the empty scratchpad stayed on the screen")
+          machine.send_key("meta_l-q")
+          wait_for("length", 0, workspace=9)
 
           machine.succeed(f"cp /tmp/input.lua.saved {config}")
           user("hyprctl reload")

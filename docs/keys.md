@@ -1,25 +1,29 @@
 # Keys, mouse buttons and the touchpad
 
 This page shows you how to change what your keys, your mouse buttons and your
-touchpad do. Everything here goes in two files in your home folder:
+touchpad do. Everything here goes in files in your home folder:
 
 | To change | Edit this file |
 |---|---|
 | Keys and mouse buttons | `~/.config/hypr/bindings/applications.lua` |
 | Touchpad and mouse settings, and touchpad swipes | `~/.config/hypr/input.lua` |
+| How the drop-down terminal slides in | `~/.config/hypr/looknfeel.lua` |
 
 You do not rebuild NixOS for these. A few keys are also ready-made NixOS
 settings: [keys for workspaces 11 and 12](settings.md#keys-for-workspaces-11-and-12)
 and [the number pad](settings.md#the-number-pad).
 
-To see every key you have now, press **SUPER + /**.
+To see every key you have now, press **SUPER + /**. Every key, button and
+swipe a new hyprsimple has is in [Every shortcut](shortcuts.md).
 
 **On this page:**
 [How to change the files](#how-to-change-the-files) ·
 [Keys](#keys) ·
 [Mouse buttons](#mouse-buttons) ·
 [The touchpad](#the-touchpad) ·
-[The number pad, by hand](#the-number-pad-by-hand)
+[The number pad, by hand](#the-number-pad-by-hand) ·
+[A drop-down terminal](#a-drop-down-terminal) ·
+[A whole layout of your own: an example](#a-whole-layout-of-your-own-an-example)
 
 ---
 
@@ -125,6 +129,44 @@ one:
 hl.unbind("SUPER + B")
 hl.bind("SUPER + B", hl.dsp.exec_cmd("brave"), { description = "Browser" })
 ```
+
+`hl.unbind` needs the keys written the way they were bound, with the held
+keys in the same order: `"SUPER + CTRL + LEFT"` takes away SUPER + CTRL + ←,
+`"CTRL + SUPER + LEFT"` takes away nothing. Big or small letters do not
+matter. [Every shortcut](shortcuts.md) shows each key the way to write it.
+
+### Keys that come from your NixOS settings
+
+The keys of [window groups](settings.md#window-groups-tabs),
+[the i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) and
+[the number pad](settings.md#the-number-pad) do jobs that have names. To
+give a job another key, use its name:
+
+```lua
+hl.bind("SUPER + Y", hyprsimple_nix.jobs.switch_layout, { description = "Switch This Workspace: Hyprland / i3 Layout" })
+```
+
+Now **SUPER + Y** does what **SUPER + CTRL + SPACE** does. To take it away
+from SUPER + CTRL + SPACE, add `hl.unbind("SUPER + CTRL + SPACE")` above
+that line.
+
+| Name | What it does | Its key now |
+|---|---|---|
+| `switch_layout` | Switches the workspace you are on between Hyprland's layout and i3's | SUPER + CTRL + SPACE |
+| `next_beside` | i3 layout: the next window you open goes beside this one | SUPER + CTRL + H |
+| `next_below` | i3 layout: the next window you open goes below this one | SUPER + CTRL + J |
+| `turn_split` | i3 layout: side by side becomes on top of each other, and back | SUPER + CTRL + E |
+| `focus_left`, `focus_right`, `focus_up`, `focus_down` | Focus the window that way, through the tabs and splits of the i3 layout too | SUPER + H, L, K, J |
+| `group` | Makes the windows a group (tabs), or undoes it. i3 layout: tabs, or side by side | SUPER + G |
+| `leave_group` | Takes the window out of its group | SUPER + ALT + G |
+| `into_group_left`, `into_group_right`, `into_group_up`, `into_group_down` | Moves the window into the group that way. i3 layout: moves the window that way | SUPER + ALT + arrows |
+| `next_tab`, `previous_tab` | The next or the previous window in the group, or tab | SUPER + ALT + TAB, SUPER + ALT + SHIFT + TAB |
+| `tab_1` … `tab_9` | Window 1 … 9 of the group, or tab | SUPER + ALT + 1 … 9 |
+| `move_left`, `move_right`, `move_up`, `move_down` | Moves the window that way, in both layouts | 7 and 9 on the number pad |
+| `first_workspace`, `last_workspace` | The first or the last workspace with windows | 8 and 2 on the number pad |
+
+Every name is there, whatever your settings: one whose setting is off does
+nothing, so your keys never stop the file from loading.
 
 ---
 
@@ -355,3 +397,178 @@ hl.bind("SUPER + code:90", hl.dsp.focus({ workspace = "10" }), { description = "
 
 A key with no held key in front (just `"code:85"`) does its job everywhere,
 and no longer types its number.
+
+---
+
+## A drop-down terminal
+
+Ghostty, the terminal hyprsimple uses, has a drop-down terminal of its own.
+One key slides it down from the top of the screen, over your windows, and
+the same key slides it away again. What you typed in it stays there.
+
+Give it a key, in `~/.config/hypr/bindings/applications.lua`:
+
+```lua
+hl.bind("F12", hl.dsp.exec_cmd("sh -c 'systemctl --user start app-com.mitchellh.ghostty.service && ghostty +toggle-quick-terminal'"), { description = "Drop-down Terminal" })
+```
+
+The first part starts Ghostty in the background, the first time you press the
+key. Without it, that very first press opens an ordinary Ghostty window
+instead.
+
+To have it slide down, with what is behind it blurred, add this to
+`~/.config/hypr/looknfeel.lua`:
+
+```lua
+hl.layer_rule({ match = { namespace = "ghostty-quick-terminal" }, blur = true, ignore_alpha = 0.1, animation = "slide top" })
+```
+
+Its size, and whether it slides away by itself when you click somewhere
+else, are Ghostty settings. They go in `~/.config/ghostty/config`:
+
+```
+quick-terminal-size = 50%
+quick-terminal-autohide = true
+```
+
+---
+
+## A whole layout of your own: an example
+
+This is one i3 user's layout. It moves many keys at once, so it shows every
+way of doing it: keys taken away with `hl.unbind`, hyprsimple's jobs on
+other keys, jobs [by name](#keys-that-come-from-your-nixos-settings), new
+keys, and the mouse's side buttons. Copy what you like.
+
+| Keys | What they do now | Before |
+|---|---|---|
+| **SUPER + ←, →, ↑, ↓** | Focus the window that way | SUPER + H, L, K, J |
+| **SUPER + CTRL + arrows** | Window bigger or smaller | SUPER + SHIFT + arrows |
+| **SUPER + SHIFT + arrows** | Move the window into a group (i3 layout: move it) | SUPER + ALT + arrows |
+| **SUPER + ALT + arrows** | Move the workspace to another screen | SUPER + CTRL + arrows |
+| **SUPER + ENTER** | Terminal (SUPER + T still works too) | nothing |
+| **SUPER + D** | App launcher | SUPER + A |
+| **SUPER + P** | Colour picker | SUPER + M |
+| **SUPER + Z** | Float the window, or tile it again | SUPER + W |
+| **SUPER + SHIFT + F** | Fullscreen, and back | nothing |
+| **SUPER + TAB**, **SUPER + SHIFT + TAB** | Next or previous workspace, and round again | nothing |
+| **SUPER + S** | Show or hide the scratchpad | sound panel |
+| **SUPER + SHIFT + S** | The window into the scratchpad, or back out of it | into the scratchpad |
+| **SUPER + SHIFT + G** | Take the window out of its group | SUPER + ALT + G |
+| **SUPER + A** | Switch the workspace: Hyprland's layout or i3's | SUPER + CTRL + SPACE |
+| **SUPER + H**, **SUPER + J**, **SUPER + E** | i3 layout: next window beside, below, turn the split | SUPER + CTRL + H, J, E |
+| **SUPER + SHIFT + A** | Sound panel | SUPER + S |
+| **SUPER + ALT + D** | Notifications panel | SUPER + SHIFT + D |
+| **SUPER + SHIFT + D** | Clear the notifications | SUPER + D |
+| **SUPER + SHIFT + E** | Power menu (SUPER + ESC still works too) | nothing |
+| **SUPER + L** | Lock the screen | SUPER + SHIFT + L |
+| **SUPER + M** | Hide or show the bar (CTRL + ESC still works too) | colour picker |
+| **SUPER + PRINT** | Screenshot of the whole screen, at once | nothing |
+| **SHIFT + PRINT** | Screenshot of the window you are in, at once | nothing |
+| **. on the number pad**, mouse **forward** button | [Drop-down terminal](#a-drop-down-terminal) | nothing |
+| mouse **back** button | Back to the workspace you were on | nothing |
+| **SUPER + X** | Nothing (the power menu has Log out) | log out |
+
+And **SUPER + a workspace's number**, or a click on its name on the bar,
+takes you back to the workspace before when you are on it already, like i3's
+`workspace_auto_back_and_forth`.
+
+It needs [window groups](settings.md#window-groups-tabs) and
+[the i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) on, and
+the [drop-down terminal](#a-drop-down-terminal)'s slide comes from its
+`looknfeel.lua` line. Put the whole block at the end of
+`~/.config/hypr/bindings/applications.lua`, then `hyprctl reload`:
+
+```lua
+-- An i3 user's keys. The keys this block gives a new job are taken away from
+-- their old one first, so no key does two things.
+local vars = require("default.hypr.vars")
+local jobs = hyprsimple_nix.jobs
+local home = os.getenv("HOME")
+local shots = home .. "/Pictures/Screenshots"
+
+for _, keys in ipairs({
+  "SUPER + A", "SUPER + M", "SUPER + W", "SUPER + D", "SUPER + S", "SUPER + X",
+  "SUPER + H", "SUPER + J", "SUPER + K", "SUPER + L",
+  "SUPER + SHIFT + RIGHT", "SUPER + SHIFT + LEFT", "SUPER + SHIFT + UP", "SUPER + SHIFT + DOWN",
+  "SUPER + CTRL + LEFT", "SUPER + CTRL + RIGHT", "SUPER + CTRL + UP", "SUPER + CTRL + DOWN",
+  "SUPER + SHIFT + S", "SUPER + SHIFT + L", "SUPER + SHIFT + D",
+  "SUPER + ALT + G", "SUPER + ALT + LEFT", "SUPER + ALT + RIGHT", "SUPER + ALT + UP", "SUPER + ALT + DOWN",
+  "SUPER + ALT + H", "SUPER + ALT + L", "SUPER + ALT + K", "SUPER + ALT + J",
+  "SUPER + ALT + TAB", "SUPER + ALT + SHIFT + TAB",
+  "SUPER + CTRL + SPACE", "SUPER + CTRL + H", "SUPER + CTRL + J", "SUPER + CTRL + E",
+}) do
+  hl.unbind(keys)
+end
+
+-- Apps.
+hl.bind("SUPER + Return", hl.dsp.exec_cmd(vars.terminal), { description = "Terminal" })
+hl.bind("SUPER + D", hl.dsp.exec_cmd(vars.menu), { description = "App Launcher" })
+hl.bind("SUPER + P", hl.dsp.exec_cmd("sh -c '" .. vars.colorPicker .. " | wl-copy'"), { description = "Color Picker" })
+
+-- Windows.
+hl.bind("SUPER + Z", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle Floating" })
+hl.bind("SUPER + SHIFT + F", hl.dsp.window.fullscreen(), { description = "Fullscreen" })
+hl.bind("SUPER + Left", jobs.focus_left, { description = "Focus Left" })
+hl.bind("SUPER + Right", jobs.focus_right, { description = "Focus Right" })
+hl.bind("SUPER + Up", jobs.focus_up, { description = "Focus Up" })
+hl.bind("SUPER + Down", jobs.focus_down, { description = "Focus Down" })
+hl.bind("SUPER + CTRL + Right", hl.dsp.window.resize({ x = 30, y = 0, relative = true }), { description = "Resize Right", repeating = true })
+hl.bind("SUPER + CTRL + Left", hl.dsp.window.resize({ x = -30, y = 0, relative = true }), { description = "Resize Left", repeating = true })
+hl.bind("SUPER + CTRL + Up", hl.dsp.window.resize({ x = 0, y = -30, relative = true }), { description = "Resize Up", repeating = true })
+hl.bind("SUPER + CTRL + Down", hl.dsp.window.resize({ x = 0, y = 30, relative = true }), { description = "Resize Down", repeating = true })
+
+-- Workspaces. SUPER + TAB goes round: after the last workspace, the first.
+hl.bind("SUPER + Tab", hl.dsp.focus({ workspace = "e+1" }), { description = "Next Workspace" })
+hl.bind("SUPER + SHIFT + Tab", hl.dsp.focus({ workspace = "e-1" }), { description = "Previous Workspace" })
+hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"), { description = "Show / Hide the Scratchpad" })
+hl.bind("SUPER + SHIFT + S", function()
+  local window = hl.get_active_window()
+  if not window then
+    return
+  end
+  if window.workspace and window.workspace.special then
+    local here = hl.get_active_workspace()
+    if here then
+      hl.dispatch(hl.dsp.window.move({ workspace = tostring(here.id) }))
+    end
+  else
+    hl.dispatch(hl.dsp.window.move({ workspace = "special:magic", follow = false }))
+  end
+end, { description = "Window into / out of the Scratchpad" })
+for _, way in ipairs({ { "Left", "l" }, { "Right", "r" }, { "Up", "u" }, { "Down", "d" } }) do
+  hl.bind("SUPER + ALT + " .. way[1], hl.dsp.workspace.move({ monitor = way[2] }), { description = "Move Workspace to " .. way[1] .. " Monitor" })
+end
+-- SUPER + the workspace you are on, or a click on it on the bar, goes back to
+-- the one before, like i3's workspace_auto_back_and_forth.
+hl.config({ binds = { workspace_back_and_forth = true } })
+
+-- Window groups and the i3 layout.
+hl.bind("SUPER + SHIFT + G", jobs.leave_group, { description = "Take Window out of Group" })
+hl.bind("SUPER + SHIFT + Left", jobs.into_group_left, { description = "Move Window into Group Left (i3 layout: Move Window Left)" })
+hl.bind("SUPER + SHIFT + Right", jobs.into_group_right, { description = "Move Window into Group Right (i3 layout: Move Window Right)" })
+hl.bind("SUPER + SHIFT + Up", jobs.into_group_up, { description = "Move Window into Group Up (i3 layout: Move Window Up)" })
+hl.bind("SUPER + SHIFT + Down", jobs.into_group_down, { description = "Move Window into Group Down (i3 layout: Move Window Down)" })
+hl.bind("SUPER + A", jobs.switch_layout, { description = "Switch This Workspace: Hyprland / i3 Layout" })
+hl.bind("SUPER + H", jobs.next_beside, { description = "i3 Layout: Next Window Beside" })
+hl.bind("SUPER + J", jobs.next_below, { description = "i3 Layout: Next Window Below" })
+hl.bind("SUPER + E", jobs.turn_split, { description = "i3 Layout: Turn the Split" })
+
+-- Panels on the bar, and the system.
+hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd(vars.barPanel .. "volume"), { description = "Sound (panel: volume and output device)" })
+hl.bind("SUPER + ALT + D", hl.dsp.exec_cmd(vars.barPanel .. "notifications"), { description = "Notifications (panel)" })
+hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd(home .. "/.local/bin/notification-dismiss.sh"), { description = "Dismiss Notifications" })
+hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd(vars.powermenu), { description = "Power Menu" })
+hl.bind("SUPER + L", hl.dsp.exec_cmd("hyprlock"), { description = "Lock Screen" })
+hl.bind("SUPER + M", hl.dsp.exec_cmd(home .. "/.local/bin/hyprsimple-restart-bar.sh --toggle"), { description = "Toggle Bar" })
+hl.bind("SUPER + Print", hl.dsp.exec_cmd("hyprshot -m output -m active --output-folder " .. shots), { description = "Screenshot of the Whole Screen" })
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd("hyprshot -m window -m active --output-folder " .. shots), { description = "Screenshot of the Window" })
+
+-- The drop-down terminal (see "A drop-down terminal"), and the side buttons
+-- of the mouse: forward for the drop-down terminal, back for the workspace
+-- before.
+local dropdown = hl.dsp.exec_cmd("sh -c 'systemctl --user start app-com.mitchellh.ghostty.service && ghostty +toggle-quick-terminal'")
+hl.bind("code:91", dropdown, { description = "Drop-down Terminal" })
+hl.bind("mouse:276", dropdown, { description = "Drop-down Terminal" })
+hl.bind("mouse:275", hl.dsp.focus({ workspace = "previous" }), { description = "Back to the Workspace Before" })
+```

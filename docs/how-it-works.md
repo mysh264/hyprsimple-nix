@@ -61,7 +61,9 @@ describes parts 1 and 2 the NixOS way:
   an INI file). The ones that change
   Hyprland are the Lua in [`modules/hyprland.lua`](../modules/hyprland.lua),
   written with your settings to `/etc/hyprsimple/hyprland.lua`, which
-  hyprsimple's own config loads.
+  hyprsimple's own config loads. The jobs its keys do are also in a table,
+  `hyprsimple_nix.jobs`, so your own keys can do them
+  ([keys guide](keys.md#keys-that-come-from-your-nixos-settings)).
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 
@@ -235,8 +237,13 @@ nix flake check   # the virtual machine test needs KVM
   checks that an app opens on its own workspace; presses the keys for
   workspaces 11 and 12 and every number pad key; zooms in Viewnior with a
   pretend touchpad (and checks that a wheel click is one step); loads every
-  example in the [keys guide](keys.md) and swipes with three fingers;
-  moves the bar to the bottom and opens a panel and a notification there; runs `hyprsimple-update`
+  example in the [keys guide](keys.md) and swipes with three fingers, then
+  presses the keys of its example layout (the i3 layout switch by its job's
+  name, back and forth between workspaces, SUPER + TAB, the scratchpad in and
+  out); checks that [Every shortcut](shortcuts.md) lists exactly the keys
+  Hyprland has; logs out and in again and checks that the bar got its
+  settings from the new login, at the bottom, and opens a panel and a
+  notification there; runs `hyprsimple-update`
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the
