@@ -96,7 +96,9 @@ pkgs.testers.runNixOSTest {
           print(user("tail -n 150 /run/user/1000/hypr/*/hyprland.log 2>&1", check=False)[1])
 
       machine.wait_for_unit("multi-user.target")
-      machine.wait_for_unit("user@1000.service")
+      # The automatic login may not have begun yet, and then wait_for_unit
+      # gives up at once on a unit with nothing queued: wait for it to start.
+      machine.wait_until_succeeds("systemctl is-active user@1000.service", timeout=120)
 
       with subtest("the system provides what hyprsimple-install needs"):
           machine.succeed("test -d /etc/hyprsimple/source/default/quickshell")
