@@ -682,13 +682,35 @@ pkgs.testers.runNixOSTest {
           machine.succeed(f"cp /tmp/input.lua.saved {config}")
           user("hyprctl reload")
 
-      with subtest("the bar at the bottom, with its panels and notifications opening upwards"):
+      with subtest("after logging out and in, the bar is at the bottom with even workspaces, and opens upwards"):
           machine.succeed("grep -Eq 'HYPRSIMPLE_BAR +DEFAULT=\"bottom\"' /etc/pam/environment")
           machine.succeed("grep -Eq 'HYPRSIMPLE_BAR_WORKSPACE_WIDTH +DEFAULT=\"65\"' /etc/pam/environment")
-          # The setting reaches a new session. This one gets the bar restarted
-          # with it, as a new login would start it.
-          print(user("systemd-run --user --wait --collect --pipe --quiet -p KillMode=process"
-                     " sh -c 'HYPRSIMPLE_BAR=bottom HYPRSIMPLE_BAR_WORKSPACE_WIDTH=65 ~/.local/bin/hyprsimple-restart-bar.sh' 2>&1"))
+          # This session began before the rebuild that brought the settings, as
+          # a user's does. The guide says to log out and back in, so this does:
+          # out of Hyprland, and out of tty1 too, so that the automatic login
+          # makes a new login. That login has to bring the settings to the bar
+          # by itself, while systemd's user manager, still running from the
+          # first login, does not have them.
+          machine.wait_until_succeeds("su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 uwsm stop'", timeout=60)
+          machine.wait_until_fails("pgrep -u alice -f 'Hyprland --watchdog-fd'", timeout=60)
+          machine.succeed("rm -rf /run/user/1000/hypr")
+          first_login = machine.succeed("pgrep -o -t tty1 -u alice bash").strip()
+          machine.send_chars("exit\n")
+          machine.wait_until_succeeds(f"p=$(pgrep -o -t tty1 -u alice bash) && [ \"$p\" != {first_login} ]", timeout=60)
+          machine.send_chars("uwsm start hyprland-uwsm.desktop\n")
+          bar_command = "qs -p /home/alice/.local/share/hyprsimple/default/quickshell"
+          try:
+              machine.wait_until_succeeds("ls /run/user/1000/hypr/*/.socket.sock", timeout=180)
+              machine.wait_until_succeeds(f"pgrep -u alice -f '{bar_command}'", timeout=120)
+          except Exception:
+              machine.screenshot("no-session-after-login")
+              dump_session()
+              raise
+          bar = machine.succeed(f"pgrep -o -u alice -f '{bar_command}'").strip()
+          bar_env = machine.succeed(f"tr '\\0' '\\n' < /proc/{bar}/environ").split("\n")
+          print("the bar's settings:", [v for v in bar_env if v.startswith("HYPRSIMPLE_")])
+          for setting in ("HYPRSIMPLE_BAR=bottom", "HYPRSIMPLE_BAR_WORKSPACE_WIDTH=65"):
+              assert setting in bar_env, f"the new login did not bring {setting} to the bar"
           def bar_layer():
               for monitor in json.loads(user("hyprctl layers -j")).values():
                   for layers in monitor["levels"].values():
@@ -698,6 +720,8 @@ pkgs.testers.runNixOSTest {
           monitor = json.loads(user("hyprctl monitors -j"))[0]
           eventually(lambda: (bar_layer() or {}).get("y", 0) > 0 and bar_layer()["y"] + bar_layer()["h"] == monitor["height"],
                      f"the bar is not at the bottom: {bar_layer()}")
+          machine.sleep(3)
+          machine.screenshot("bar-after-login")
           panel = "qs -p ~/.local/share/hyprsimple/default/quickshell ipc call bar toggle "
           in_session(panel + "calendar")
           machine.sleep(2)

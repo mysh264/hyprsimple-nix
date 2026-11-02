@@ -546,15 +546,16 @@ in
       # has them; without them GTK programs fall back to another font.
       ++ keep [ pkgs.adwaita-fonts ];
 
-    # gsettings from a script only finds the schemas it writes when they are
-    # on XDG_DATA_DIRS. Applications carry their own; the command does not.
-    # Read by the bar (patch 0010).
+    # Read by the bar when it starts (patch 0010). A login sets these two, so
+    # a change shows after logging out and back in; tests/vm.nix checks that.
     environment.sessionVariables.HYPRSIMPLE_BAR = lib.mkIf (cfg.bar.position == "bottom") "bottom";
     # Read by the bar (patch 0008).
     environment.sessionVariables.HYPRSIMPLE_BAR_WORKSPACE_WIDTH = lib.mkIf (
       cfg.bar.workspaceWidth != null
     ) (toString cfg.bar.workspaceWidth);
 
+    # gsettings from a script only finds the schemas it writes when they are
+    # on XDG_DATA_DIRS. Applications carry their own; the command does not.
     environment.sessionVariables.XDG_DATA_DIRS = [
       "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}"
     ];
