@@ -409,7 +409,10 @@ the line out, rebuild, and log out and in.
 ```
 
 1. Add the line to `configuration.nix`, and rebuild.
-2. Log out and back in. (The bar reads this setting when you log in.)
+2. Type `hyprsimple-update`. If your hyprsimple-nix is from before this
+   setting came (3 November 2026), this brings your user the bar that knows
+   it ([Updating](update.md)); otherwise it says all is up to date.
+3. Log out and back in. (The bar reads this setting when you log in.)
 
 Hide the bar (its key, or the top left [hot corner](corners.md)): your
 windows take the whole screen. Now push the mouse pointer against the bar's

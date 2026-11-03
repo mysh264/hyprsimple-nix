@@ -84,7 +84,9 @@ sudo nixos-rebuild switch --option tarball-ttl 0
 ```
 
 `--option tarball-ttl 0` makes NixOS download hyprsimple-nix again, instead of
-using the copy it got earlier that day. Then type `hyprsimple-update`.
+using the copy it got earlier that day. Then type `hyprsimple-update`, and
+log out and back in: the bar reads its settings when you log in, and the
+Conky panel takes its new version then.
 
 ---
 
