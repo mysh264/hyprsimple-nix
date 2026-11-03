@@ -69,6 +69,14 @@ pkgs.testers.runNixOSTest {
       environment.systemPackages = [ pkgs.wayland-utils ];
       # For the pretend touchpad and mouse.
       hardware.uinput.enable = true;
+      # Without 3D, hyprpaper crashes every few seconds here. systemd still
+      # logs each crash, but no longer writes a core dump of it: writing them
+      # kept the VM busy enough that checks waiting for a key or the pointer
+      # timed out on GitHub's runners.
+      systemd.coredump.settings.Coredump = {
+        Storage = "none";
+        ProcessSizeMax = 0;
+      };
 
       virtualisation = {
         memorySize = 4096;
@@ -1018,7 +1026,15 @@ pkgs.testers.runNixOSTest {
           assert edge["y"] + edge["h"] == monitor["height"] and edge["h"] == 2, f"the edge is not along the bottom: {edge}"
           assert edge["x"] == 8 and edge["w"] == monitor["width"] - 16, f"the edge does not leave its ends to the hot corners: {edge}"
           pointer(middle_x, bottom)
-          eventually(lambda: wide_bar() is not None, "the pointer at the edge did not bring the bar back")
+          # A pointer put on the edge, without moving over it, went unseen
+          # now and then on GitHub's runners (NixOS 26.05): it is moved along
+          # the edge then, as a mouse does.
+          try:
+              eventually(lambda: wide_bar() is not None, "", timeout=10)
+          except AssertionError:
+              print("the bar did not come in 10 seconds, moving along the edge")
+              pointer(middle_x + 30, bottom)
+              eventually(lambda: wide_bar() is not None, "the pointer at the edge did not bring the bar back")
           assert room_below() == 0, "the bar came back taking room from the windows"
           machine.screenshot("bar-peek")
           pointer(middle_x, monitor["height"] // 2)
