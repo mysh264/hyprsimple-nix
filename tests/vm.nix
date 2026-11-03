@@ -947,10 +947,12 @@ pkgs.testers.runNixOSTest {
           eventually(lambda: (bar_layer() or {}).get("y", 0) > 0 and bar_layer()["y"] + bar_layer()["h"] == monitor["height"],
                      f"the bar is not at the bottom: {bar_layer()}")
           # mysh264's setup starts the Conky panel with the session, from the
-          # user's own copy, which can be changed, with its font in place.
+          # user's own copy, which can be changed, with its fonts in place:
+          # its icons, and Roboto for its text.
           eventually(lambda: machine.execute("pgrep -u alice -x conky")[0] == 0, "Conky did not start", timeout=60)
           user("test -w ~/.config/lean-conky-config/conky.conf && test -f ~/.config/lean-conky-config/local.conf.example")
           user("test -L ~/.local/share/fonts/lean-conky-config.otf && test -e ~/.local/share/fonts/lean-conky-config.otf")
+          user("test -e ~/.local/share/fonts/Roboto-Regular.ttf && test -e ~/.local/share/fonts/Roboto-Bold.ttf")
           def conky_layer():
               for monitor_layers in json.loads(user("hyprctl layers -j")).values():
                   for layers in monitor_layers["levels"].values():

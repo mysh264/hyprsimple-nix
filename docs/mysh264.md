@@ -32,7 +32,7 @@ setup.
 | `groups`, `i3` | Window groups (tabs), and the i3 layout, which workspaces 2 and 3 start in | [Window groups](settings.md#window-groups-tabs), [The i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) |
 | `dropdownTerminal` | A drop-down terminal on the number pad's dot and the mouse's forward button | [A drop-down terminal](settings.md#a-drop-down-terminal) |
 | `corners` | Hot corners: top left hides the bar, top right shows the desktop, bottom right goes back | [Hot corners](corners.md) |
-| `conky` | The Conky panel on the desktop, the wallpaper behind it blurred | [The Conky panel](conky.md) |
+| `conky` | The Conky panel on the desktop, with a GPU part, the wallpaper behind it blurred | [The Conky panel](conky.md) |
 | `muslimtify.placement` | The prayer time on the right of the bar | [Prayer times on the bar](settings.md#prayer-times-on-the-bar) |
 | `viewnior`, `viewniorKeys` | Viewnior mended for Wayland, and its keys in swayimg and imv | [Viewnior](settings.md#viewnior-the-photo-viewer-mended-for-wayland) |
 | `extraConfig` | Gaps of 5 pixels between windows, none at the screen's edge, and a 3-pixel border | [Your own lines for Hyprland](settings.md#your-own-lines-for-hyprland) |

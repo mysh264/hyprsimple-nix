@@ -231,11 +231,15 @@ hyprsimple-nix fixes both.
   Xu's Conky panel, from its Wayland version,
   [lean-conky-config-wayland](https://github.com/mysh264/lean-conky-config-wayland):
   the original with one line for Wayland, one fix for Lua 5.5 (the Lua of
-  nixos-unstable's Conky), its background made as tall as the panel, and
+  nixos-unstable's Conky), its background made as tall as the panel, a GPU
+  part for every GPU (Intel and AMD from `/sys` and `/proc/<pid>/fdinfo`,
+  NVIDIA from `nvidia-smi`), its text in Roboto (which it brings), and
   everything a new computer needs. That repository packages itself in
   `nix/package.nix`, with a Conky that measures its window the way it draws
   it (`nix/conky.nix`; Conky's own made the panel's background reach 34
-  pixels below it); [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix)
+  pixels below it; the same fix is offered to Conky in
+  [its pull request #2526](https://github.com/brndnmtthws/conky/pull/2526));
+  [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix)
   only picks its version. Its `lean-conky-config` command copies the panel
   to `~/.config/lean-conky-config` the first time, so you can change it,
   brings a newer version into that copy unless you changed the panel's own

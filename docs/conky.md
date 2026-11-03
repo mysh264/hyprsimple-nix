@@ -1,13 +1,15 @@
 # The Conky panel
 
 A clean little panel on your desktop: the time and the date, the weather, and
-how busy your computer is (its processor, memory, disks and network). It sits
-on the right of the screen, behind your windows, on top of the wallpaper.
+how busy your computer is (its processor, memory, graphics card, disks and
+network). It sits on the right of the screen, behind your windows, on top of
+the wallpaper.
 
 It is [Lean Conky Config](https://github.com/jxai/lean-conky-config) by Jason
 Xu, from its Wayland version,
 **[lean-conky-config-wayland](https://github.com/mysh264/lean-conky-config-wayland)**:
-the original, with only what it needs to run on Wayland, and everything a new
+the original, with what it needs to run on Wayland, a GPU part for every
+graphics card (Intel, AMD, NVIDIA), its text in Roboto, and everything a new
 computer needs. That repository has the full guide to changing it,
 [CUSTOMIZE.md](https://github.com/mysh264/lean-conky-config-wayland/blob/master/CUSTOMIZE.md).
 
@@ -16,6 +18,7 @@ computer needs. That repository has the full guide to changing it,
 [Change how it looks](#change-how-it-looks) ·
 [Its place](#its-place-on-the-screen) ·
 [The background](#the-background-color-see-through-blur) ·
+[The GPU part](#the-gpu-part) ·
 [Restart it](#restart-it) ·
 [A new version](#a-new-version) ·
 [Turn it off](#turn-it-off) ·
@@ -39,10 +42,11 @@ The panel appears on the right of your screen, a few seconds after you log
 in, and from then on at every login.
 
 **What happened:** the first time, the panel was copied into a folder of your
-own, **`~/.config/lean-conky-config`**, and it runs from there. Its font (the
-icons, the clock's digits) was put in `~/.local/share/fonts`. Everything it
-needs (Conky, Python, curl...) came with the setting. Its dark background is
-exactly as tall as the panel, and the wallpaper behind it is blurred.
+own, **`~/.config/lean-conky-config`**, and it runs from there. Its fonts (the
+icons, the clock's digits, and Roboto for the text) were put in
+`~/.local/share/fonts`. Everything it needs (Conky, Python, curl, lspci...)
+came with the setting. Its dark background is exactly as tall as the panel,
+and the wallpaper behind it is blurred.
 
 > 💡 The [top right hot corner](corners.md) shows the desktop: a quick way to
 > see the panel when windows cover it.
@@ -69,12 +73,15 @@ Your changes go in **one file of your own**,
    ```
 
    Every setting is there, switched off: a line that starts with `--` is a
-   note. Delete the `--` to switch a line on, and change its value.
+   note. Delete the `--` to switch a line on, and change its value. (So right
+   after copying, the panel is still the same.)
 
 3. Save (**Ctrl + O**, **Enter**), close (**Ctrl + X**), and
    [restart the panel](#restart-it).
 
-Some first changes, each going inside the part it names:
+Some first changes, each going inside the part it names. The list of parts,
+`lcc.panel`, is switched off as a whole: for a change there, first delete the
+`--` in front of each of its lines, from `lcc.panel = {` to its `}`.
 
 | To | Write |
 |---|---|
@@ -85,10 +92,13 @@ Some first changes, each going inside the part it names:
 | A blue background | In `conky.config`: `own_window_colour = "#1a3a5a",` |
 | A see-through background | In `conky.config`: `own_window_argb_value = 0,` |
 | The weather of your city | In `lcc.panel`: `{ "weather", { location = "Dubai" } },` |
+| List the programs that use the GPU | In `lcc.panel`: `{ "gpu", { top_n = 3 } },` |
+| No GPU part | In `lcc.panel`: take out the `"gpu"` line |
+| All the text in another font | In `lcc.config`: `font_family = "Ubuntu",` |
 
 [CUSTOMIZE.md](https://github.com/mysh264/lean-conky-config-wayland/blob/master/CUSTOMIZE.md)
 explains every one of them, and more: colors, fonts, which parts it shows,
-disks, an NVIDIA card, and parts of your own.
+the GPU part, disks, and parts of your own.
 
 ### Its place on the screen
 
@@ -159,6 +169,25 @@ configuration:
 Then rebuild, type `hyprctl reload`, and [restart the panel](#restart-it).
 The blur only shows through a background that is not fully solid: with
 `own_window_argb_value = 255`, there is nothing to see through.
+
+### The GPU part
+
+Under the memory, the panel shows each graphics card (GPU) of the computer:
+how busy it is, its name, and its temperature, with a graph of each. An Intel
+GPU, like most laptops have, has no temperature of its own (it is part of the
+processor), so it shows its clock instead. AMD and NVIDIA cards also show
+their clock, power and memory. It needs nothing extra: Intel and AMD tell
+Linux all of it, and NVIDIA's driver comes with `nvidia-smi`.
+
+- **The programs that use it most:** `{ "gpu", { top_n = 3 } },` in
+  `lcc.panel`. Each line makes the panel about 13 pixels taller.
+- **A laptop with two GPUs** shows both. The second one sleeps while no
+  program needs it; the panel leaves it asleep, and says `asleep`.
+- **No GPU part:** take the `"gpu"` line out of `lcc.panel`. A computer without
+  a real GPU (a virtual machine) has none anyway.
+
+[The GPU part](https://github.com/mysh264/lean-conky-config-wayland/blob/master/CUSTOMIZE.md#the-gpu-part)
+in CUSTOMIZE.md has the rest: choosing one GPU, and NVIDIA's own way.
 
 ---
 
@@ -232,12 +261,20 @@ four lines. It fixes the two causes: Conky measured the panel taller than it
 draws it (the Conky that comes with it now measures it right), and the
 network part left empty lines at its end.
 
-**Little squares instead of icons.** The font link is missing; restarting the
-panel puts it back: `lean-conky-config`.
+**Little squares instead of icons, or the text in another font.** The font
+links are missing; restarting the panel puts them back: `lean-conky-config`.
 
-**Messages like `'out_to_wayland' is deprecated` or
-`Fontconfig error: the ambiguous constant name: normal`.** Harmless: Conky and
-fontconfig are newer than some settings the panel writes the old way.
+**The weather's humidity touches its temperature, or there is no GPU part.**
+Your copy did not take the new version: see if
+`ls ~/.config/lean-conky-config/font/Roboto-Regular.ttf` finds the file. If
+not, rebuild with `--option tarball-ttl 0` to get the new hyprsimple-nix, then
+restart the panel: `lean-conky-config`. Still not there? Your copy has changes
+of your own: take the [new version](#a-new-version) with the four lines.
+
+**Messages like `'out_to_wayland' is deprecated`.** Harmless: Conky is newer
+than some settings the panel writes the old way. (`Fontconfig error: the
+ambiguous constant name: normal` comes from a font with `:normal` in your
+`local.conf`: write `Roboto:size=8`, not `Roboto:normal:size=8`.)
 
 **No weather.** It needs the internet. If it shows the wrong place, write your
 city, as in the table above.
