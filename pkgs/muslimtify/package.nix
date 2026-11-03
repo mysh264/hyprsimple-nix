@@ -36,6 +36,10 @@ stdenv.mkDerivation (finalAttrs: {
     # prayer times hours off. Also an upstream bug, on any system whose
     # zoneinfo is not in /usr/share/zoneinfo.
     ./0002-timezone-offset-without-tzdir.patch
+    # `muslimtify daemon uninstall` (which hyprsimple-uninstall.sh runs when
+    # it removes the plugin) said "To fully remove: sudo ./uninstall.sh",
+    # a script NixOS does not have. It now names the NixOS setting.
+    ./0003-nixos-how-to-remove.patch
   ];
 
   # One test asserts that the machine running it has a timezone configured in

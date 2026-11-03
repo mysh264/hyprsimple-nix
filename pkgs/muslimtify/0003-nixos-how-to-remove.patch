@@ -1,0 +1,16 @@
+diff --git a/src/cli/cmd_daemon.c b/src/cli/cmd_daemon.c
+index 353c35d..70dbdd3 100644
+--- a/src/cli/cmd_daemon.c
++++ b/src/cli/cmd_daemon.c
+@@ -107,7 +107,10 @@ static int daemon_uninstall_handler(int argc, char **argv) {
+     printf("Note: No unit files were found (already uninstalled?)\n");
+ 
+   printf("\nDaemon uninstalled. Binary and config files are untouched.\n");
+-  printf("To fully remove: sudo ./uninstall.sh\n");
++  // NixOS: there is no install.sh here, so no uninstall.sh either. The
++  // binary comes from the NixOS configuration, and goes with it.
++  printf("To fully remove it on NixOS: set programs.hyprsimple.muslimtify.enable = false;\n"
++         "in your configuration and rebuild. Its settings stay in ~/.config/muslimtify.\n");
+   return 0;
+ }
+ 
