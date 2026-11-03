@@ -980,6 +980,10 @@ pkgs.testers.runNixOSTest {
           except Exception:
               print(user("journalctl --user -b --no-pager | grep -iE 'conky|lcc' | tail -n 40", check=False)[1])
               raise
+          # Drawn, not just there: NixOS 26.05's own Conky (1.22.3) left a
+          # 1x1 surface in the middle of the screen. The panel is 288 wide.
+          eventually(lambda: (conky_layer() or {}).get("w", 0) >= 200 and conky_layer()["h"] >= 400,
+                     f"the Conky panel is not drawn full size: {conky_layer()}", timeout=60)
           print("the Conky panel:", conky_layer())
           machine.sleep(3)
           machine.screenshot("bar-after-login")

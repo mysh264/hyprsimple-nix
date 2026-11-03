@@ -41,6 +41,10 @@ computer needs. That repository has the full guide to changing it,
 The panel appears on the right of your screen, a few seconds after you log
 in, and from then on at every login.
 
+On NixOS 26.05, the first rebuild takes a few minutes longer: it builds a
+newer Conky (1.25.3) for the panel, because 26.05's own (1.22.3) cannot draw
+it on Wayland.
+
 **What happened:** the first time, the panel was copied into a folder of your
 own, **`~/.config/lean-conky-config`**, and it runs from there. Its fonts (the
 icons, the clock's digits, and Roboto for the text) were put in

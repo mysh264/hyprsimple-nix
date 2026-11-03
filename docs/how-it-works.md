@@ -238,7 +238,10 @@ hyprsimple-nix fixes both.
   `nix/package.nix`, with a Conky that measures its window the way it draws
   it (`nix/conky.nix`; Conky's own made the panel's background reach 34
   pixels below it; the same fix is offered to Conky in
-  [its pull request #2526](https://github.com/brndnmtthws/conky/pull/2526));
+  [its pull request #2526](https://github.com/brndnmtthws/conky/pull/2526);
+  where the system's Conky is older than 1.25.3, as NixOS 26.05's 1.22.3, it
+  builds 1.25.3 instead, since the older ones cannot draw the panel on
+  Wayland);
   [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix)
   only picks its version. Its `lean-conky-config` command copies the panel
   to `~/.config/lean-conky-config` the first time, so you can change it,
