@@ -905,9 +905,11 @@ pkgs.testers.runNixOSTest {
           user("jq -e '.plugins.muslimtify.placement == \"right\"' ~/.config/hyprsimple/plugins.json")
           press("meta_l-1", 1)
 
-      with subtest("after logging out and in, the bar is at the bottom with even workspaces, and opens upwards"):
+      with subtest("after logging out and in, the bar is at the bottom with even workspaces, opens upwards, and comes back at the edge"):
           machine.succeed("grep -Eq 'HYPRSIMPLE_BAR +DEFAULT=\"bottom\"' /etc/pam/environment")
           machine.succeed("grep -Eq 'HYPRSIMPLE_BAR_WORKSPACE_WIDTH +DEFAULT=\"65\"' /etc/pam/environment")
+          machine.succeed("grep -Eq 'HYPRSIMPLE_BAR_PEEK +DEFAULT=\"1\"' /etc/pam/environment")
+          machine.succeed("grep -Eq 'HYPRSIMPLE_BAR_PEEK_INSET +DEFAULT=\"8\"' /etc/pam/environment")
           # This session began before the rebuild that brought the settings, as
           # a user's does. The guide says to log out and back in, so this does:
           # out of Hyprland, and out of tty1 too, so that the automatic login
@@ -932,7 +934,8 @@ pkgs.testers.runNixOSTest {
           bar = machine.succeed(f"pgrep -o -u alice -f '{bar_command}'").strip()
           bar_env = machine.succeed(f"tr '\\0' '\\n' < /proc/{bar}/environ").split("\n")
           print("the bar's settings:", [v for v in bar_env if v.startswith("HYPRSIMPLE_")])
-          for setting in ("HYPRSIMPLE_BAR=bottom", "HYPRSIMPLE_BAR_WORKSPACE_WIDTH=65"):
+          for setting in ("HYPRSIMPLE_BAR=bottom", "HYPRSIMPLE_BAR_WORKSPACE_WIDTH=65",
+                          "HYPRSIMPLE_BAR_PEEK=1", "HYPRSIMPLE_BAR_PEEK_INSET=8"):
               assert setting in bar_env, f"the new login did not bring {setting} to the bar"
           def bar_layer():
               for monitor in json.loads(user("hyprctl layers -j")).values():
@@ -963,6 +966,49 @@ pkgs.testers.runNixOSTest {
           print("the Conky panel:", conky_layer())
           machine.sleep(3)
           machine.screenshot("bar-after-login")
+
+          # The hidden bar comes back at the bottom edge, over the windows,
+          # which keep the whole screen, and goes again when the pointer
+          # leaves it. The edge leaves its two ends to the hot corners.
+          def wide_bar():
+              for monitor_layers in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor_layers["levels"].values():
+                      for found in layers:
+                          if found["namespace"] == "quickshell" and found["w"] > monitor["width"] // 2:
+                              return found
+          def peek_edge():
+              for monitor_layers in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor_layers["levels"].values():
+                      for found in layers:
+                          if found["namespace"] == "quickshell-peek":
+                              return found
+          def room_below():
+              return json.loads(user("hyprctl monitors -j"))[0]["reserved"][3]
+          def pointer(x, y):
+              user(f"hyprctl dispatch 'hl.dsp.cursor.move({{ x = {x}, y = {y} }})'")
+          visible = "qs -p ~/.local/share/hyprsimple/default/quickshell ipc call bar toggleVisible"
+          middle_x, bottom = monitor["width"] // 2, monitor["height"] - 1
+          pointer(middle_x, monitor["height"] // 2)
+          assert peek_edge() is None, "the edge is there while the bar is shown"
+          in_session(visible)
+          eventually(lambda: wide_bar() is None and room_below() == 0, "the bar did not hide")
+          eventually(lambda: peek_edge() is not None, "no edge to bring the hidden bar back")
+          edge = peek_edge()
+          assert edge["y"] + edge["h"] == monitor["height"] and edge["h"] == 2, f"the edge is not along the bottom: {edge}"
+          assert edge["x"] == 8 and edge["w"] == monitor["width"] - 16, f"the edge does not leave its ends to the hot corners: {edge}"
+          pointer(middle_x, bottom)
+          eventually(lambda: wide_bar() is not None, "the pointer at the edge did not bring the bar back")
+          assert room_below() == 0, "the bar came back taking room from the windows"
+          machine.screenshot("bar-peek")
+          pointer(middle_x, monitor["height"] // 2)
+          eventually(lambda: wide_bar() is None, "the bar did not go when the pointer left it")
+          # Touched and left at once, without going onto the bar.
+          pointer(middle_x, bottom)
+          pointer(middle_x, monitor["height"] // 2)
+          eventually(lambda: wide_bar() is None and peek_edge() is not None, "the bar stayed after the edge was only touched")
+          in_session(visible)
+          eventually(lambda: wide_bar() is not None and room_below() == 36, "the bar did not come back for good")
+          assert peek_edge() is None, "the edge stayed with the bar shown"
           panel = "qs -p ~/.local/share/hyprsimple/default/quickshell ipc call bar toggle "
           in_session(panel + "calendar")
           machine.sleep(2)

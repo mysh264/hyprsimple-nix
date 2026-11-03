@@ -234,6 +234,7 @@ from it, and it works again. Corners rest while a window is full screen.
 | **Top right corner** | Shows the desktop (an empty workspace); there again, back to where you were |
 | **Bottom right corner** | Back to the workspace you were on before |
 | **Bottom left corner** | Nothing |
+| **Bottom edge, with the bar hidden** | The bar comes back for a moment, over your windows, and goes when the pointer leaves it ([the hidden bar back at the edge](settings.md#the-hidden-bar-back-at-the-edge)) |
 
 ## The mouse on the bar
 

@@ -680,6 +680,15 @@ if nix.conky then
   end)
 end
 
+-- The wallpaper behind it blurred, as behind the drop-down terminal. The
+-- panel is "conky" on Wayland with newer Conky, "conky_namespace" with 1.22.
+-- Where its background is fully see-through, there is no blur.
+if nix.conky_blur then
+  for _, namespace in ipairs({ "conky", "conky_namespace" }) do
+    hl.layer_rule({ match = { namespace = namespace }, blur = true, ignore_alpha = 0.1 })
+  end
+end
+
 -- ---- Your own keys win ------------------------------------------------------
 
 -- Your files in ~/.config/hypr load after this one. When one of them binds a

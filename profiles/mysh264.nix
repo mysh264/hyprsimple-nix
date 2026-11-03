@@ -35,6 +35,8 @@ in
     ];
     bar.workspaceWidth = mkDefault 65;
     bar.position = mkDefault "bottom";
+    # The hidden bar back for a moment at the bottom edge of the screen.
+    bar.peek.enable = mkDefault true;
 
     # Apps that always open on their own workspace. (Not Zen: "zen" would
     # also catch zenity's small dialog windows and zenmap.)

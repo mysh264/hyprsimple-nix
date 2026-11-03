@@ -12,10 +12,10 @@
 # anything first. It only happens when the setting is on.
 { pkgs }:
 let
-  rev = "44067a1bb8c56994b859914ad8c6593d56a12357";
+  rev = "08f6089be9592e2e70ca08e979d133b58457a5d0";
   src = builtins.fetchTarball {
     url = "https://github.com/mysh264/lean-conky-config-wayland/archive/${rev}.tar.gz";
-    sha256 = "1kpx0yfpd86zsvyh1cm9bmjj9ab8lxprq4hpsf7rc8dm8cyvb2li";
+    sha256 = "1lq0zvnpk4zs0kmn7n1jlblz8gqpgifinlgxliwrj5dslwam7d9g";
   };
 in
 pkgs.callPackage "${src}/nix/package.nix" { inherit src; }

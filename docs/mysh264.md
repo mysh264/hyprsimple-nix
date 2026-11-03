@@ -25,13 +25,14 @@ setup.
 |---|---|---|
 | `workspaces.names` | Workspaces 1 to 12 named Web, Code, Term, Edit, Files, Videos, Photos, Theater, Game, Chat, Music, Lab | [Name your workspaces](settings.md#name-your-workspaces) |
 | `bar.position`, `bar.workspaceWidth` | The bar at the bottom, every workspace 65 pixels wide | [The bar at the bottom](settings.md#the-bar-at-the-bottom) |
+| `bar.peek` | The hidden bar back for a moment at the bottom edge of the screen | [The hidden bar back at the edge](settings.md#the-hidden-bar-back-at-the-edge) |
 | `workspaces.apps` | Browsers on 1, Claude and Cursor on 2, Kate and gedit on 4, mpv on 6, the photo viewers on 7, Jellyfin on 8, Steam on 9 | [Apps on their own workspace](settings.md#put-apps-on-their-own-workspace) |
 | `keys.i3Style` | Keys in i3's style: SUPER + arrows, SUPER + ENTER, SUPER + D... | [Keys in i3's style](settings.md#keys-in-i3s-style) |
 | `keys.workspaces11and12`, `keys.numpad` | Keys for workspaces 11 and 12, and the number pad as workspace keys | [Keys for workspaces 11 and 12](settings.md#keys-for-workspaces-11-and-12), [The number pad](settings.md#the-number-pad) |
 | `groups`, `i3` | Window groups (tabs), and the i3 layout, which workspaces 2 and 3 start in | [Window groups](settings.md#window-groups-tabs), [The i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) |
 | `dropdownTerminal` | A drop-down terminal on the number pad's dot and the mouse's forward button | [A drop-down terminal](settings.md#a-drop-down-terminal) |
 | `corners` | Hot corners: top left hides the bar, top right shows the desktop, bottom right goes back | [Hot corners](corners.md) |
-| `conky` | The Conky panel on the desktop | [The Conky panel](conky.md) |
+| `conky` | The Conky panel on the desktop, the wallpaper behind it blurred | [The Conky panel](conky.md) |
 | `muslimtify.placement` | The prayer time on the right of the bar | [Prayer times on the bar](settings.md#prayer-times-on-the-bar) |
 | `viewnior`, `viewniorKeys` | Viewnior mended for Wayland, and its keys in swayimg and imv | [Viewnior](settings.md#viewnior-the-photo-viewer-mended-for-wayland) |
 | `extraConfig` | Gaps of 5 pixels between windows, none at the screen's edge, and a 3-pixel border | [Your own lines for Hyprland](settings.md#your-own-lines-for-hyprland) |
@@ -95,6 +96,7 @@ own `configuration.nix`, below the `imports`:
 ```nix
   programs.hyprsimple.bar.position = "top";       # the bar back at the top
   programs.hyprsimple.conky.enable = false;       # no Conky panel
+  programs.hyprsimple.bar.peek.enable = false;    # the hidden bar stays hidden
   programs.hyprsimple.corners.topRight = "launcher";
 ```
 

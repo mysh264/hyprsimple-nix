@@ -241,6 +241,7 @@ With [hot corners](corners.md) on: push the pointer into a corner of the screen.
 | **Top right corner** | Shows the desktop (an empty workspace); there again, back to where you were |
 | **Bottom right corner** | Back to the workspace you were on before |
 | **Bottom left corner** | Nothing |
+| **The bar's edge, with the bar hidden** | With [the hidden bar back at the edge](settings.md#the-hidden-bar-back-at-the-edge) on: the bar comes back for a moment, over your windows, and goes when the pointer leaves it |
 
 ## The mouse on the bar
 

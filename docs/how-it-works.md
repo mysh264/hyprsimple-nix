@@ -67,7 +67,8 @@ describes parts 1 and 2 the NixOS way:
   file has the keys in i3's style (`programs.hyprsimple.keys.i3Style`), the
   drop-down terminal (`dropdownTerminal`), the hot corners (`corners`: a
   timer looks where the pointer is 20 times a second, as Hyprland has no
-  corner event) and the start of the Conky panel (`conky`), and then your
+  corner event), the start of the Conky panel (`conky`) and the blur behind
+  it (`conky.blur`, a layer rule), and then your
   own lines (`extraConfig`). It ends by wrapping `hl.bind` for the files
   that load after it: when one of yours binds a key a setting bound too, the
   setting's bind steps aside, so your key does your job alone.
@@ -97,7 +98,7 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Thirteen small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+- Fourteen small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
   Numbers 1 to 4, 6 and 7 only do something when `/etc/hyprsimple` exists, so
   hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
@@ -142,6 +143,12 @@ NixOS:
      points to Part 2 of the [removal guide](uninstall.md). It deletes
      `~/.local/share/hyprsimple` only when that holds nothing of yours, and
      keeps work you put in `git stash` there, on Arch too.
+  14. The bar, while hidden, comes back over the windows when the pointer
+     touches its edge of the screen, and goes again when the pointer leaves
+     it (`programs.hyprsimple.bar.peek.enable`). An invisible strip, 2 pixels
+     deep, lies along that edge while the bar is hidden, but for the ends
+     the hot corners use; the bar shown this way takes no room from the
+     windows. Without the setting, the bar is as before.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -224,12 +231,16 @@ hyprsimple-nix fixes both.
   Xu's Conky panel, from its Wayland version,
   [lean-conky-config-wayland](https://github.com/mysh264/lean-conky-config-wayland):
   the original with one line for Wayland, one fix for Lua 5.5 (the Lua of
-  nixos-unstable's Conky), and everything a new computer needs. That
-  repository packages itself in `nix/package.nix`;
-  [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix) only
-  picks its version. Its `lean-conky-config` command copies the panel to
-  `~/.config/lean-conky-config` the first time, so you can change it, and
-  starts it with Conky, Python and the rest on its PATH.
+  nixos-unstable's Conky), its background made as tall as the panel, and
+  everything a new computer needs. That repository packages itself in
+  `nix/package.nix`, with a Conky that measures its window the way it draws
+  it (`nix/conky.nix`; Conky's own made the panel's background reach 34
+  pixels below it); [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix)
+  only picks its version. Its `lean-conky-config` command copies the panel
+  to `~/.config/lean-conky-config` the first time, so you can change it,
+  brings a newer version into that copy unless you changed the panel's own
+  files (your `local.conf` always stays), and starts it with Conky, Python
+  and the rest on its PATH. That Conky is the one on everyone's PATH too.
 
 ## How it is tested
 
@@ -285,8 +296,10 @@ nix flake check   # the virtual machine test needs KVM
   into three hot corners and checks that each does its job; moves the prayer
   time with `hyprsimple-update`; logs out and in again and checks that the
   bar got its settings from the new login, at the bottom, and opens a panel
-  and a notification there, and that the Conky panel started, from the
-  user's own copy, with its font; runs `hyprsimple-update`
+  and a notification there, that the Conky panel started, from the
+  user's own copy, with its font, and that the hidden bar comes back over
+  the windows at the bottom edge (but not in the hot corners) and goes again;
+  runs `hyprsimple-update`
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the

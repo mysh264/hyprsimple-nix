@@ -228,6 +228,7 @@ in
         grep -q 'corner_jobs = { bottom_left = { command = "firefox --new-window" }' $TMPDIR/everything.lua
         grep -q 'top_left = { job = "toggle_bar" }' $TMPDIR/everything.lua
         grep -q 'programs.hyprsimple.extraConfig' $TMPDIR/everything.lua
+        grep -q 'conky_blur = true' $TMPDIR/profile.lua
         touch $out
       '';
 

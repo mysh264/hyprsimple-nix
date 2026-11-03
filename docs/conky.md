@@ -14,6 +14,8 @@ computer needs. That repository has the full guide to changing it,
 **On this page:**
 [Turn it on](#turn-it-on) ·
 [Change how it looks](#change-how-it-looks) ·
+[Its place](#its-place-on-the-screen) ·
+[The background](#the-background-color-see-through-blur) ·
 [Restart it](#restart-it) ·
 [A new version](#a-new-version) ·
 [Turn it off](#turn-it-off) ·
@@ -39,7 +41,8 @@ in, and from then on at every login.
 **What happened:** the first time, the panel was copied into a folder of your
 own, **`~/.config/lean-conky-config`**, and it runs from there. Its font (the
 icons, the clock's digits) was put in `~/.local/share/fonts`. Everything it
-needs (Conky, Python, curl...) came with the setting.
+needs (Conky, Python, curl...) came with the setting. Its dark background is
+exactly as tall as the panel, and the wallpaper behind it is blurred.
 
 > 💡 The [top right hot corner](corners.md) shows the desktop: a quick way to
 > see the panel when windows cover it.
@@ -79,12 +82,83 @@ Some first changes, each going inside the part it names:
 | Put it on the left | In `conky.config`: `alignment = "top_left",` |
 | Move it away from the edge | In `conky.config`: `gap_x = T_.sr(20), gap_y = T_.sr(40),` |
 | Make the clock orange | In `conky.config`: `color0 = "orange",` |
+| A blue background | In `conky.config`: `own_window_colour = "#1a3a5a",` |
 | A see-through background | In `conky.config`: `own_window_argb_value = 0,` |
 | The weather of your city | In `lcc.panel`: `{ "weather", { location = "Dubai" } },` |
 
 [CUSTOMIZE.md](https://github.com/mysh264/lean-conky-config-wayland/blob/master/CUSTOMIZE.md)
 explains every one of them, and more: colors, fonts, which parts it shows,
 disks, an NVIDIA card, and parts of your own.
+
+### Its place on the screen
+
+In `conky.config`, in your `local.conf`:
+
+```lua
+conky.config = {
+    alignment = "bottom_left",
+    gap_x = T_.sr(20),
+    gap_y = T_.sr(10),
+}
+```
+
+- **`alignment`** is the corner or edge it sits against: `"top_left"`,
+  `"top_middle"`, `"top_right"` (the normal one), `"middle_left"`,
+  `"middle_right"`, `"bottom_left"`, `"bottom_middle"` or `"bottom_right"`.
+- **`gap_x`** is its distance from the left or right edge of the screen, and
+  **`gap_y`** from the top or bottom edge, in pixels. (`T_.sr(...)` makes them
+  grow with the panel's `scale`.)
+
+It keeps clear of the bar: at the bottom of the screen, it sits just above a
+bar there, and `gap_y` counts from the bar's edge. The example puts it in the
+bottom left corner, 20 pixels from the side and 10 above the bar.
+
+### The background: color, see-through, blur
+
+In `conky.config`, in your `local.conf`:
+
+```lua
+conky.config = {
+    own_window_colour = "#1a3a5a",
+    own_window_argb_value = 200,
+}
+```
+
+- **`own_window_colour`** is its color: a name, like `"black"` (the normal
+  one) or `"navy"`, or a code, like `"#1a3a5a"` (the one a color picker
+  shows). Conky then says it calls this `own_window_color` now: harmless,
+  the old name works with every Conky.
+- **`own_window_argb_value`** is how solid it is: `0` is fully see-through,
+  `255` fully solid, and the normal one is `128`, half.
+
+It is always as tall as the panel: add a part, or take one away, and the
+background grows or shrinks with it.
+
+**The blur** behind it comes from Hyprland, and is on. In your NixOS
+configuration:
+
+- To turn it off:
+
+  ```nix
+    programs.hyprsimple.conky.blur = false;
+  ```
+
+- To make it stronger or softer, set Hyprland's blur, which is the same for
+  everything it blurs (the panel, the drop-down terminal, see-through windows):
+
+  ```nix
+    programs.hyprsimple.extraConfig = ''
+      hl.config({ decoration = { blur = { size = 8, passes = 3 } } })
+    '';
+  ```
+
+  `size` is how far the blur spreads (hyprsimple's is 5): bigger is
+  blurrier. `passes` is how many times it blurs (hyprsimple's is 3): more is
+  smoother. A blur set in `~/.config/hypr/looknfeel.lua` wins over this one.
+
+Then rebuild, type `hyprctl reload`, and [restart the panel](#restart-it).
+The blur only shows through a background that is not fully solid: with
+`own_window_argb_value = 255`, there is nothing to see through.
 
 ---
 
@@ -102,9 +176,14 @@ It stops the panel that runs, and starts it again, with your change.
 
 ## A new version
 
-Your copy in `~/.config/lean-conky-config` is yours: new versions of
-hyprsimple-nix do not replace it. To start again from the newest version,
-type these four lines:
+A new version of the panel comes with a new hyprsimple-nix, and goes into
+your copy in `~/.config/lean-conky-config` by itself, at your next login after
+the rebuild. Your `local.conf` stays as it is.
+
+Only if you changed one of the panel's own files (not `local.conf`), your copy
+stays as it was, and the panel says which files, in
+`journalctl --user -b | grep -A3 "Lean Conky"`. To take the new version all
+the same, start again from a fresh copy with these four lines:
 
 ```sh
 mv ~/.config/lean-conky-config ~/.config/lean-conky-config.old
@@ -116,6 +195,10 @@ lean-conky-config
 The first line moves your old copy aside. The second makes a new copy and
 starts it. The third brings your `local.conf` back, and the fourth restarts
 the panel with it. (No `local.conf` yet? Skip the last two lines.)
+
+A copy made by an older hyprsimple-nix needs these four lines once, too: it
+does not have the list of its files that new versions go by. See if yours
+has it: `ls ~/.config/lean-conky-config/.lean-conky-config.sha256`.
 
 ---
 
@@ -141,6 +224,13 @@ conky -c conky.conf
 
 A line naming `local.conf` and a number points at a mistake there: fix that
 line, or rename `local.conf` to try without it.
+
+**The dark background reaches below the panel.** Your copy is from an older
+hyprsimple-nix: `ls ~/.config/lean-conky-config/.lean-conky-config.sha256`
+says there is no such file. Take the [new version](#a-new-version) with the
+four lines. It fixes the two causes: Conky measured the panel taller than it
+draws it (the Conky that comes with it now measures it right), and the
+network part left empty lines at its end.
 
 **Little squares instead of icons.** The font link is missing; restarting the
 panel puts it back: `lean-conky-config`.

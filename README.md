@@ -63,7 +63,7 @@ line: **[mysh264's setup](docs/mysh264.md)**.
 | [Every shortcut](docs/shortcuts.md) | Every key, mouse button and touchpad action hyprsimple has, one on each line |
 | [Keys, mouse buttons and the touchpad](docs/keys.md) | Changing what your keys, each mouse button and touchpad swipes do |
 | [Hot corners](docs/corners.md) | The mouse in a corner of the screen hides the bar, shows the desktop, or anything you choose |
-| [The Conky panel](docs/conky.md) | A panel on the desktop with the time, the weather and how busy your computer is, and how to change it |
+| [The Conky panel](docs/conky.md) | A panel on the desktop with the time, the weather and how busy your computer is, and how to change it: its place, its background's color, how see-through it is, and the blur behind it |
 | [mysh264's setup](docs/mysh264.md) | The maintainer's whole setup, on any computer with one line, and [every shortcut in it](docs/shortcuts-mysh264.md) |
 | [When something goes wrong](docs/troubleshooting.md) | Fixes for common problems, and how to ask for help |
 | [Removing](docs/uninstall.md) | Taking hyprsimple off again, and getting your old settings back |

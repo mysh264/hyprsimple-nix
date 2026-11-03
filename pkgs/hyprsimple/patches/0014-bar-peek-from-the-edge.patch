@@ -1,0 +1,131 @@
+diff --git a/default/quickshell/bar/Bar.qml b/default/quickshell/bar/Bar.qml
+index ef82c8b..060009f 100644
+--- a/default/quickshell/bar/Bar.qml
++++ b/default/quickshell/bar/Bar.qml
+@@ -30,9 +30,16 @@ PanelWindow {
+         openPanel = openPanel === name ? "" : name
+     }
+ 
++    // hyprsimple-nix: shown over the windows while the bars are hidden, because
++    // the pointer came to the edge (shell.qml). It then takes no room of its own,
++    // so the windows stay where they are. And whether the pointer is on it.
++    property bool peeking: false
++    readonly property bool hovered: peekHover.hovered
++    HoverHandler { id: peekHover }
++
+     screen: modelData
+     anchors { top: !Theme.barAtBottom; bottom: Theme.barAtBottom; left: true; right: true }
+-    exclusionMode: ExclusionMode.Auto
++    exclusionMode: peeking ? ExclusionMode.Ignore : ExclusionMode.Auto
+     implicitHeight: Theme.barHeight
+     color: Theme.bg
+     Behavior on color { CAnim {} }
+diff --git a/default/quickshell/bar/BarPeekEdge.qml b/default/quickshell/bar/BarPeekEdge.qml
+new file mode 100644
+index 0000000..9e11874
+--- /dev/null
++++ b/default/quickshell/bar/BarPeekEdge.qml
+@@ -0,0 +1,34 @@
++import QtQuick
++import Quickshell
++import Quickshell.Wayland
++import qs.theme
++
++// hyprsimple-nix: a thin strip along the bar's edge of the screen, invisible,
++// there only while the bar is hidden (programs.hyprsimple.bar.peek.enable).
++// The pointer touching it brings the bar back over the windows: see
++// shell.qml. Its ends are left to the hot corners. It stays below a window in
++// full screen, like the bar.
++PanelWindow {
++    id: edge
++
++    required property var modelData
++    // Shown: the bar is hidden and not already brought back.
++    property bool active: false
++    signal entered()
++
++    screen: modelData
++    visible: active
++    anchors { top: !Theme.barAtBottom; bottom: Theme.barAtBottom; left: true; right: true }
++    margins.left: Theme.barPeekInset
++    margins.right: Theme.barPeekInset
++    implicitHeight: Theme.barPeekEdge
++    exclusionMode: ExclusionMode.Ignore
++    color: "transparent"
++    WlrLayershell.namespace: "quickshell-peek"
++
++    MouseArea {
++        anchors.fill: parent
++        hoverEnabled: true
++        onEntered: edge.entered()
++    }
++}
+diff --git a/default/quickshell/shell.qml b/default/quickshell/shell.qml
+index 7dff347..2a8212f 100644
+--- a/default/quickshell/shell.qml
++++ b/default/quickshell/shell.qml
+@@ -28,6 +28,34 @@ ShellRoot {
+     // The bars are hidden, with the shell still running. Notifications need it running.
+     property bool barsHidden: false
+ 
++    // hyprsimple-nix: hidden bars shown for a moment, over the windows, because
++    // the pointer came to the bar's edge of the screen (Theme.barPeek). They go
++    // again a little after the pointer has left them, or has only touched the
++    // edge, unless a panel is open.
++    property bool barsPeeking: false
++    onBarsHiddenChanged: barsPeeking = false
++    readonly property bool peekHovered: bars.instances.some(bar => bar.hovered)
++    onPeekHoveredChanged: if (!peekHovered) peekLinger.restart()
++    onPanelOwnerChanged: if (panelOwner === null) peekLinger.restart()
++
++    Timer {
++        id: peekLinger
++        interval: Theme.barPeekLingerMs
++        onTriggered: if (!root.peekHovered && root.panelOwner === null) root.barsPeeking = false
++    }
++
++    Variants {
++        model: Theme.barPeek ? Quickshell.screens : []
++
++        BarPeekEdge {
++            active: root.barsHidden && !root.barsPeeking
++            onEntered: {
++                root.barsPeeking = true
++                peekLinger.restart()
++            }
++        }
++    }
++
+     // A screen recording is running, as told over ipc. Whatever told it can be
+     // wrong or never call back: a test once reported a recording that did not exist.
+     // So while it is lit the shell looks for a recorder itself and clears it when there is none.
+@@ -82,7 +110,8 @@ ShellRoot {
+ 
+         Bar {
+             pluginRegistry: externalPlugins
+-            visible: !root.barsHidden
++            visible: !root.barsHidden || root.barsPeeking
++            peeking: root.barsHidden && root.barsPeeking
+             recording: root.recording
+             stats: systemStats
+             idle: idleWatch
+diff --git a/default/quickshell/theme/Theme.qml b/default/quickshell/theme/Theme.qml
+index 60101d8..aae045b 100644
+--- a/default/quickshell/theme/Theme.qml
++++ b/default/quickshell/theme/Theme.qml
+@@ -26,6 +26,15 @@ Singleton {
+     // from programs.hyprsimple.bar.position. The panels, notifications and
+     // tooltips then open upwards out of it.
+     readonly property bool barAtBottom: Quickshell.env("HYPRSIMPLE_BAR") === "bottom"
++    // hyprsimple-nix: while the bar is hidden, the pointer at the bar's edge of
++    // the screen shows it again over the windows, until the pointer leaves it,
++    // from programs.hyprsimple.bar.peek.enable. How deep the edge is, how much
++    // of each end it leaves to the hot corners (their size, when they are on),
++    // in pixels, and how long the bar stays after the pointer has left it.
++    readonly property bool barPeek: Quickshell.env("HYPRSIMPLE_BAR_PEEK") === "1"
++    readonly property int barPeekEdge: 2
++    readonly property int barPeekInset: Number(Quickshell.env("HYPRSIMPLE_BAR_PEEK_INSET")) || 0
++    readonly property int barPeekLingerMs: 400
+     readonly property color danger: colors.danger ?? "#f7768e"
+ 
+     FileView {

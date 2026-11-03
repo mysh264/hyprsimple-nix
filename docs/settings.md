@@ -402,6 +402,29 @@ Wi-Fi and the others), the notifications and the little hints all open
 upwards out of it. To put it back at the top, write `"top"` instead, or take
 the line out, rebuild, and log out and in.
 
+### The hidden bar back at the edge
+
+```nix
+  programs.hyprsimple.bar.peek.enable = true;
+```
+
+1. Add the line to `configuration.nix`, and rebuild.
+2. Log out and back in. (The bar reads this setting when you log in.)
+
+Hide the bar (its key, or the top left [hot corner](corners.md)): your
+windows take the whole screen. Now push the mouse pointer against the bar's
+edge of the screen, the bottom one with the bar at the bottom: the bar comes
+back, over your windows, which stay where they are. Use it, open its panels,
+then move the pointer away, and it goes again. Show it with its key, and it
+stays, as before.
+
+The edge is the last 2 pixels of the screen, all along it but for its two
+ends, which stay [hot corners](corners.md) when those are on. While the bar
+is hidden, those 2 pixels of a window under them do not take a click. A
+window in full screen (a film, a game) covers the edge, so the bar never
+comes over it. To turn it off, take the line out, rebuild, and log out and
+in.
+
 ### Every workspace the same width on the bar
 
 ```nix
@@ -647,7 +670,14 @@ A clean panel on the desktop, on the right of the screen: the time, the
 weather, and how busy your computer is. It is the original Lean Conky Config,
 made to run on Wayland. It starts at every login, from your own copy in
 `~/.config/lean-conky-config`, which you can change as you like:
-[The Conky panel](conky.md) shows how.
+[The Conky panel](conky.md) shows how, and how to move it and change its
+background.
+
+The wallpaper behind it is blurred. To turn that off:
+
+```nix
+  programs.hyprsimple.conky.blur = false;
+```
 
 ### Your own lines for Hyprland
 

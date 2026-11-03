@@ -78,6 +78,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     # counts as hyprsimple-nix's own when its commits are all
     # hyprsimple-nix's. Work in git stash keeps it, here and on Arch.
     ./patches/0013-nixos-uninstall.patch
+    # Quickshell bar: while it is hidden, the pointer at its edge of the screen
+    # shows it again over the windows, which stay where they are, until the
+    # pointer leaves it. The ends of the edge are left to the hot corners.
+    # From programs.hyprsimple.bar.peek.enable, through HYPRSIMPLE_BAR_PEEK.
+    ./patches/0014-bar-peek-from-the-edge.patch
   ];
 
   # Paths that only exist on an FHS distribution. --replace-fail makes a

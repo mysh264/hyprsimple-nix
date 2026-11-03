@@ -43,6 +43,11 @@ Now the corners do this:
 > 💡 The desktop is workspace 97, kept empty. The bar shows it as **97**
 > while you are there.
 
+> 💡 Hid the bar with the top left corner? Push the pointer against the bar's
+> edge of the screen to see it for a moment, with
+> [the hidden bar back at the edge](settings.md#the-hidden-bar-back-at-the-edge).
+> That edge leaves its two ends to the corners.
+
 ---
 
 ## What a corner can do

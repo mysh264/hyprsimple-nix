@@ -174,6 +174,7 @@ let
       corner_size = ${toString cfg.corners.size},
       corner_jobs = { ${lib.concatStringsSep ", " (lib.mapAttrsToList luaCorner corners)} },
       conky = ${lib.boolToString cfg.conky.enable},
+      conky_blur = ${lib.boolToString (cfg.conky.enable && cfg.conky.blur)},
     }
 
     ${builtins.readFile ./hyprland.lua}''
@@ -453,6 +454,14 @@ in
       '';
     };
 
+    bar.peek.enable = lib.mkEnableOption ''
+      the hidden bar coming back for a moment: while the bar is hidden (its
+      key, or the top left hot corner), the pointer at the bar's edge of the
+      screen shows it again, over the windows, which stay where they are. It
+      goes again when the pointer leaves it, unless one of its panels is
+      open. With hot corners on, the two ends of that edge are left to them.
+      A change shows at the next login'';
+
     loginEntry.enable = lib.mkEnableOption ''
       a "Hyprsimple" entry on the login screen, next to "Hyprland (UWSM)".
       It starts the same configuration; it changes the name you pick, and puts
@@ -549,6 +558,17 @@ in
           The panel, with its {command}`lean-conky-config` command, which
           copies it to ~/.config/lean-conky-config the first time and starts
           it.
+        '';
+      };
+      blur = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        example = false;
+        description = ''
+          The wallpaper behind the panel blurred, like frosted glass, as
+          behind the drop-down terminal. How strong the blur is, is
+          Hyprland's own setting for everything it blurs,
+          `decoration.blur.size` and `passes`: docs/conky.md shows how.
         '';
       };
     };
@@ -720,10 +740,10 @@ in
       ++ lib.optional cfg.viewnior.enable (lib.hiPrio hyprsimplePkgs.viewnior)
       ++ lib.optional cfg.viewniorKeys.enable pkgs.imv
       # The panel, and Conky itself, for `conky -c conky.conf` when you try a
-      # change by hand.
+      # change by hand: the panel's own, which measures its window right.
       ++ lib.optionals cfg.conky.enable [
         cfg.conky.package
-        pkgs.conky
+        (cfg.conky.package.conky or pkgs.conky)
       ];
 
     fonts.packages =
@@ -732,9 +752,15 @@ in
       # has them; without them GTK programs fall back to another font.
       ++ keep [ pkgs.adwaita-fonts ];
 
-    # Read by the bar when it starts (patch 0010). A login sets these two, so
-    # a change shows after logging out and back in; tests/vm.nix checks that.
+    # Read by the bar when it starts (patch 0010). A login sets these, so a
+    # change shows after logging out and back in; tests/vm.nix checks that.
     environment.sessionVariables.HYPRSIMPLE_BAR = lib.mkIf (cfg.bar.position == "bottom") "bottom";
+    # Read by the bar when it starts (patch 0014): the peek, and how much of
+    # each end of the edge it leaves to the hot corners.
+    environment.sessionVariables.HYPRSIMPLE_BAR_PEEK = lib.mkIf cfg.bar.peek.enable "1";
+    environment.sessionVariables.HYPRSIMPLE_BAR_PEEK_INSET = lib.mkIf (
+      cfg.bar.peek.enable && cfg.corners.enable
+    ) (toString cfg.corners.size);
     # Read by the bar (patch 0008).
     environment.sessionVariables.HYPRSIMPLE_BAR_WORKSPACE_WIDTH = lib.mkIf (
       cfg.bar.workspaceWidth != null
