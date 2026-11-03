@@ -6,7 +6,8 @@ part says which.
 
 * To see the keys you have now, press **SUPER + /**.
 * To change any of them, see [Keys, mouse buttons and the touchpad](keys.md).
-  It ends with [a whole layout of one user's own](keys.md#a-whole-layout-of-your-own-an-example).
+* The maintainer's setup, with [keys in i3's style](settings.md#keys-in-i3s-style),
+  has a list of its own: [Every shortcut in mysh264's setup](shortcuts-mysh264.md).
 
 Key names: **SUPER** is the Windows key. **← → ↑ ↓** are the arrow keys.
 **Numpad 4** is the 4 on the number pad, the block of numbers on the right of
@@ -22,7 +23,9 @@ big keyboards.
 [The system](#the-system) ·
 [Media keys](#media-keys) ·
 [The number pad](#the-number-pad) ·
+[The drop-down terminal](#the-drop-down-terminal) ·
 [The mouse](#the-mouse) ·
+[Hot corners](#hot-corners) ·
 [The mouse on the bar](#the-mouse-on-the-bar) ·
 [The touchpad](#the-touchpad) ·
 [Photo viewers](#photo-viewers)
@@ -207,6 +210,14 @@ With [the number pad](settings.md#the-number-pad) on. No SUPER is needed, and th
 | **SHIFT + Numpad 9** | Go to workspace 9 |
 | **SHIFT + Numpad 0** | Go to workspace 10 |
 
+## The drop-down terminal
+
+With [the drop-down terminal](settings.md#a-drop-down-terminal) on. Its setting can give it other keys.
+
+| Keys | What happens |
+|---|---|
+| **F12** | A terminal slides down from the top of the screen, or away again |
+
 ## The mouse
 
 | Keys | What happens |
@@ -219,6 +230,17 @@ With [the number pad](settings.md#the-number-pad) on. No SUPER is needed, and th
 | **SUPER + ALT + wheel up** | The window before in the group, or tab (with groups or the i3 layout) |
 
 The window under the pointer gets the keyboard: focus follows the mouse. The side buttons (back and forward) do nothing yet: [Give a button a job](keys.md#give-a-button-a-job) shows how.
+
+## Hot corners
+
+With [hot corners](corners.md) on: push the pointer into a corner of the screen. A corner works once; move away from it, and it works again. Corners rest while a window is full screen.
+
+| Keys | What happens |
+|---|---|
+| **Top left corner** | Hides the bar, or shows it again |
+| **Top right corner** | Shows the desktop (an empty workspace); there again, back to where you were |
+| **Bottom right corner** | Back to the workspace you were on before |
+| **Bottom left corner** | Nothing |
 
 ## The mouse on the bar
 

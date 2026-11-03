@@ -40,12 +40,15 @@ jobs:
             .#checks.x86_64-linux.scripts \
             .#checks.x86_64-linux.module-eval \
             .#checks.x86_64-linux.template-eval \
+            .#checks.x86_64-linux.profile-eval \
+            .#checks.x86_64-linux.hyprland-config \
             .#checks.x86_64-linux.gpu-detect \
             .#checks.x86_64-linux.gpu-eval \
             .#checks.x86_64-linux.gpu-docs \
             .#checks.x86_64-linux.docs-links \
             .#checks.x86_64-linux.hyprsimple \
             .#checks.x86_64-linux.hyprqt6engine \
+            .#checks.x86_64-linux.lean-conky-config \
             .#checks.x86_64-linux.muslimtify \
             .#checks.x86_64-linux.quickshell
 

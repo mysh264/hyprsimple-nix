@@ -92,7 +92,41 @@ let
     || cfg.groups.enable
     || cfg.i3.enable
     || cfg.keys.workspaces11and12.enable
-    || cfg.keys.numpad.enable;
+    || cfg.keys.numpad.enable
+    || cfg.keys.i3Style.enable
+    || cfg.dropdownTerminal.enable
+    || cfg.corners.enable
+    || cfg.conky.enable;
+
+  # What a hot corner can do by name, and the job in hyprland.lua that does
+  # it. Anything else in a corner's setting is a command to run.
+  cornerJobs = {
+    bar = "toggle_bar";
+    desktop = "show_desktop";
+    back = "workspace_before";
+    launcher = "launcher";
+    terminal = "terminal";
+    dropdown-terminal = "dropdown_terminal";
+    scratchpad = "scratchpad";
+    notifications = "notifications";
+    lock = "lock";
+    power-menu = "power_menu";
+  };
+  corners = lib.filterAttrs (_: value: value != null) {
+    top_left = cfg.corners.topLeft;
+    top_right = cfg.corners.topRight;
+    bottom_left = cfg.corners.bottomLeft;
+    bottom_right = cfg.corners.bottomRight;
+  };
+  luaCorner =
+    corner: value:
+    "${corner} = "
+    + (
+      if cornerJobs ? ${value} then
+        "{ job = ${luaString cornerJobs.${value}} }"
+      else
+        "{ command = ${luaString value} }"
+    );
 
   # An app's window class, matched by a part of it, in any letter case.
   appRules = lib.concatLists (
@@ -133,9 +167,20 @@ let
       hy3 = ${luaString (lib.optionalString cfg.i3.enable "${cfg.i3.package}/lib/libhy3.so")},
       workspaces_11_12 = ${lib.boolToString cfg.keys.workspaces11and12.enable},
       numpad = ${lib.boolToString cfg.keys.numpad.enable},
+      i3_style = ${lib.boolToString cfg.keys.i3Style.enable},
+      dropdown = ${lib.boolToString cfg.dropdownTerminal.enable},
+      dropdown_keys = ${luaList luaString cfg.dropdownTerminal.keys},
+      corners = ${lib.boolToString cfg.corners.enable},
+      corner_size = ${toString cfg.corners.size},
+      corner_jobs = { ${lib.concatStringsSep ", " (lib.mapAttrsToList luaCorner corners)} },
+      conky = ${lib.boolToString cfg.conky.enable},
     }
 
-    ${builtins.readFile ./hyprland.lua}'';
+    ${builtins.readFile ./hyprland.lua}''
+  + lib.optionalString (cfg.extraConfig != "") ''
+
+    -- ---- programs.hyprsimple.extraConfig ------------------------------------
+    ${cfg.extraConfig}'';
 
   # hy3, the plugin behind the i3 layout, built for this system's Hyprland. A
   # plugin only loads into the Hyprland version it was built for, and nixpkgs'
@@ -243,6 +288,24 @@ in
         default = hyprsimplePkgs.muslimtify;
         defaultText = lib.literalMD "muslimtify from hyprsimple-nix";
         description = "The muslimtify package.";
+      };
+      placement = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "left"
+            "center"
+            "right"
+          ]
+        );
+        default = null;
+        example = "right";
+        description = ''
+          Where the prayer time sits on the bar: "left" (after the
+          workspaces), "center" (after the clock) or "right" (before the
+          icons). {command}`hyprsimple-install` sets it, and so does
+          {command}`hyprsimple-update` when it changed. null leaves it to the
+          plugin and to you (~/.config/hyprsimple/plugins.json).
+        '';
       };
     };
 
@@ -397,9 +460,126 @@ in
       {command}`hyprsimple-session.sh` (or {command}`install.sh --session-entry`)
       adds on Arch. Text logins such as tuigreet's `--cmd` start it with
       {command}`uwsm start hyprsimple.desktop`'';
+
+    keys.i3Style.enable = lib.mkEnableOption ''
+      keys in i3's style, the maintainer's own: SUPER + arrows move the
+      focus, SUPER + ENTER opens the terminal, SUPER + D the app launcher,
+      SUPER + SHIFT + arrows move the window, SUPER + CTRL + arrows resize
+      it, SUPER + TAB goes through the workspaces, SUPER + A switches a
+      workspace's layout, and more (docs/shortcuts-mysh264.md lists every
+      key). Each key it moves is taken from its old job first. It works best
+      with groups.enable and i3.enable on. A key you bind yourself, in
+      ~/.config/hypr, takes the place of its key here'';
+
+    dropdownTerminal = {
+      enable = lib.mkEnableOption ''
+        a drop-down terminal: a key slides Ghostty down from the top of the
+        screen, over your windows, and the same key slides it away again'';
+      keys = lib.mkOption {
+        type = lib.types.listOf (lib.types.strMatching "[^\n]+");
+        default = [ "F12" ];
+        example = [
+          "F12"
+          "code:91"
+          "mouse:276"
+        ];
+        description = ''
+          The keys or mouse buttons that bring it down and send it away, as
+          Hyprland writes them: "F12", "SUPER + GRAVE", "code:91" (the dot
+          on the number pad), "mouse:276" (the mouse's forward button).
+        '';
+      };
+    };
+
+    corners = {
+      enable = lib.mkEnableOption ''
+        hot corners: the mouse pointer in a corner of the screen does a job,
+        once, until it leaves the corner again. Corners rest while a window
+        is full screen'';
+      topLeft = lib.mkOption {
+        type = lib.types.nullOr (lib.types.strMatching "[^\n]+");
+        default = "bar";
+        description = ''
+          What the top left corner does. One of "bar" (hide or show the
+          bar), "desktop" (an empty workspace, and back again), "back" (the
+          workspace you were on before), "launcher", "terminal",
+          "dropdown-terminal", "scratchpad", "notifications", "lock" or
+          "power-menu"; any other text is a command to run, like "firefox";
+          null does nothing.
+        '';
+      };
+      topRight = lib.mkOption {
+        type = lib.types.nullOr (lib.types.strMatching "[^\n]+");
+        default = "desktop";
+        description = "What the top right corner does, like `topLeft`.";
+      };
+      bottomLeft = lib.mkOption {
+        type = lib.types.nullOr (lib.types.strMatching "[^\n]+");
+        default = null;
+        example = "launcher";
+        description = "What the bottom left corner does, like `topLeft`.";
+      };
+      bottomRight = lib.mkOption {
+        type = lib.types.nullOr (lib.types.strMatching "[^\n]+");
+        default = "back";
+        description = "What the bottom right corner does, like `topLeft`.";
+      };
+      size = lib.mkOption {
+        type = lib.types.ints.between 1 200;
+        default = 8;
+        description = ''
+          How close to a corner the pointer has to come, in pixels. Raise it
+          if a corner is hard to hit.
+        '';
+      };
+    };
+
+    conky = {
+      enable = lib.mkEnableOption ''
+        Lean Conky Config, a panel on the desktop with the time, the weather,
+        and how busy the computer is, from
+        github.com/mysh264/lean-conky-config-wayland: the original by Jason
+        Xu, made to run on Wayland. It starts at every login, from your own
+        copy in ~/.config/lean-conky-config, which you can change'';
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = hyprsimplePkgs.lean-conky-config;
+        defaultText = lib.literalMD "lean-conky-config from hyprsimple-nix";
+        description = ''
+          The panel, with its {command}`lean-conky-config` command, which
+          copies it to ~/.config/lean-conky-config the first time and starts
+          it.
+        '';
+      };
+    };
+
+    extraConfig = lib.mkOption {
+      type = lib.types.lines;
+      default = "";
+      example = ''
+        hl.config({ general = { gaps_in = 5, gaps_out = 0, border_size = 3 } })
+      '';
+      description = ''
+        Lines of your own for Hyprland's configuration, in Lua, the language
+        of ~/.config/hypr. They run after hyprsimple-nix's additions and
+        before your files in ~/.config/hypr, so those still win. A key bound
+        here takes the place of the same key from a setting above. Unlike
+        your files, these come back by themselves on a new computer.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    # Ghostty 1.4 brought `ghostty +toggle-quick-terminal`, the one way to
+    # bring its drop-down terminal down from outside Ghostty.
+    warnings =
+      lib.optional (cfg.dropdownTerminal.enable && lib.versionOlder pkgs.ghostty.version "1.4")
+        ''
+          programs.hyprsimple.dropdownTerminal needs Ghostty 1.4 or newer, and
+          this system has Ghostty ${pkgs.ghostty.version}: its keys do nothing yet.
+          nixos-unstable has Ghostty 1.4; NixOS 26.11 will have it too.
+        '';
+
     assertions = [
       {
         assertion = lib.all (n: builtins.match "[1-9][0-9]*" n != null) (lib.attrNames cfg.workspaces.apps);
@@ -538,7 +718,13 @@ in
       ++ lib.optional cfg.loginEntry.enable loginEntry
       # Ahead of a pkgs.viewnior in the same list, which has the same files.
       ++ lib.optional cfg.viewnior.enable (lib.hiPrio hyprsimplePkgs.viewnior)
-      ++ lib.optional cfg.viewniorKeys.enable pkgs.imv;
+      ++ lib.optional cfg.viewniorKeys.enable pkgs.imv
+      # The panel, and Conky itself, for `conky -c conky.conf` when you try a
+      # change by hand.
+      ++ lib.optionals cfg.conky.enable [
+        cfg.conky.package
+        pkgs.conky
+      ];
 
     fonts.packages =
       keep (lib.concatMap (e: e.fonts or [ ]) (lib.attrValues mapping))
@@ -605,6 +791,9 @@ in
       "hyprsimple/settings".text = ''
         HYPRSIMPLE_NIX_DEFAULT_THEME=${lib.escapeShellArg cfg.defaultTheme}
         HYPRSIMPLE_NIX_MUSLIMTIFY=${if cfg.muslimtify.enable then "1" else "0"}
+        HYPRSIMPLE_NIX_MUSLIMTIFY_PLACEMENT=${
+          if cfg.muslimtify.placement == null then "" else cfg.muslimtify.placement
+        }
       '';
     }
     // lib.optionalAttrs cfg.viewniorKeys.enable viewniorKeysFiles;

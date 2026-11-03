@@ -69,11 +69,12 @@ sudo nano /etc/nixos/configuration.nix
 **3. Remove hyprsimple-nix itself.**
 
 - **No flake:** in the `imports` list, remove the line with
-  `hyprsimple-nix/archive/main.tar.gz` in it.
+  `hyprsimple-nix/archive/main.tar.gz` in it (also the one ending in
+  `profiles/mysh264.nix`, if you used [mysh264's setup](mysh264.md)).
 - **With a flake:** in `/etc/nixos/flake.nix`, remove the `hyprsimple-nix`
   input (four lines), `hyprsimple-nix,` in the `outputs` line, and
-  `hyprsimple-nix.nixosModules.default` in `modules`. These are the parts the
-  [install guide](install.md#step-1b-you-use-a-flake) added.
+  `hyprsimple-nix.nixosModules.default` (or `.mysh264`) in `modules`. These
+  are the parts the [install guide](install.md#step-1b-you-use-a-flake) added.
 
 > 💡 **Keep `./gpu.nix`** in your imports if you made one. Your graphics card
 > still needs those settings, with any desktop.
@@ -100,6 +101,10 @@ A few small things are not hyprsimple's alone, so they stay:
   You can delete them, or leave them.
 - **Muslimtify's settings** in `~/.config/muslimtify`, if you used prayer
   times.
+- **Your copy of the Conky panel** in `~/.config/lean-conky-config`, with
+  your changes, and the link to its font,
+  `~/.local/share/fonts/lean-conky-config.otf`, if you used
+  [the Conky panel](conky.md). Delete both when you no longer want them.
 - **Anything moved away**, with names ending in `.hyprsimple-removed`, and
   older backups with names like `hypr.backup.1793001234`. Look with
   `ls -d ~/.config/*.hyprsimple-removed* ~/.config/*.backup.*`, and delete

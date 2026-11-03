@@ -3,6 +3,7 @@
 # update to a changed hyprsimple version.
 { pkgs, self }:
 let
+  inherit (pkgs) lib;
   # The muslimtify plugin, so its install can run without network access.
   muslimtifyPlugin = pkgs.fetchFromGitHub {
     owner = "muslimtify-org";
@@ -42,7 +43,14 @@ pkgs.testers.runNixOSTest {
         programs.hyprsimple.keys.numpad.enable = true;
         programs.hyprsimple.viewnior.enable = true;
         programs.hyprsimple.viewniorKeys.enable = true;
+        programs.hyprsimple.dropdownTerminal.enable = true;
         # The unmended one as well, which the mended one has to win over.
+        environment.systemPackages = [ pkgs.viewnior ];
+      };
+      # mysh264's whole setup (profiles/mysh264.nix), switched to after the
+      # extras: keys in i3's style, hot corners, the Conky panel and more.
+      specialisation.mysh264.configuration = {
+        imports = [ self.nixosModules.mysh264 ];
         environment.systemPackages = [ pkgs.viewnior ];
       };
       # hyprsimple ships setup for these two shells as well; test them too.
@@ -661,12 +669,16 @@ pkgs.testers.runNixOSTest {
               eventually(lambda: title(app) == "", f"esc did not close {app}")
           press("meta_l-1", 1)
 
-      with subtest("Every shortcut (docs/shortcuts.md) lists the keys there are, and only those"):
-          page = open("${../docs/shortcuts.md}").read()
+      # A page of shortcuts lists exactly the keys Hyprland has: every key on
+      # it is bound, and every bound key is on it.
+      def shortcuts_match(path):
+          page = open(path).read()
           held = {"SUPER": 64, "CTRL": 4, "ALT": 8, "SHIFT": 1}
           names = {"→": "right", "←": "left", "↑": "up", "↓": "down", "ESC": "escape", "/": "slash",
+                   "ENTER": "return",
                    "left button, drag": "mouse:272", "right button, drag": "mouse:273",
                    "wheel down": "mouse_down", "wheel up": "mouse_up",
+                   "Mouse back button": "mouse:275", "Mouse forward button": "mouse:276",
                    "Volume Up key": "XF86AudioRaiseVolume", "Volume Down key": "XF86AudioLowerVolume",
                    "Mute key": "XF86AudioMute", "Microphone Mute key": "XF86AudioMicMute",
                    "Play key": "XF86AudioPlay", "Pause key": "XF86AudioPause",
@@ -674,11 +686,12 @@ pkgs.testers.runNixOSTest {
                    "Brightness Up key": "XF86MonBrightnessUp", "Brightness Down key": "XF86MonBrightnessDown",
                    "Keyboard Light Up key": "XF86KbdBrightnessUp", "Keyboard Light Down key": "XF86KbdBrightnessDown"}
           codes = {"-": 20, "=": 21, "Numpad 0": 90, "Numpad 1": 87, "Numpad 2": 88, "Numpad 3": 89,
-                   "Numpad 4": 83, "Numpad 5": 84, "Numpad 6": 85, "Numpad 7": 79, "Numpad 8": 80, "Numpad 9": 81}
+                   "Numpad 4": 83, "Numpad 5": 84, "Numpad 6": 85, "Numpad 7": 79, "Numpad 8": 80, "Numpad 9": 81,
+                   "Numpad .": 91}
           documented = set()
           for part in page.split("\n## ")[1:]:
-              # The bar, the touchpad and the photo viewers are not Hyprland's keys.
-              if part.split("\n", 1)[0] in ("The mouse on the bar", "The touchpad", "Photo viewers"):
+              # The corners, the bar, the touchpad and the photo viewers are not Hyprland's keys.
+              if part.split("\n", 1)[0] in ("Hot corners", "The mouse on the bar", "The touchpad", "Photo viewers"):
                   continue
               for keys in re.findall(r"^\| \*\*(.+?)\*\* \|", part, re.M):
                   *mods, last = keys.split(" + ")
@@ -696,11 +709,14 @@ pkgs.testers.runNixOSTest {
           unnamed = collections.Counter(mask for mask, key, code in bound if not key and not code)
           if unnamed:
               by_place = collections.Counter(mask for mask, key, code in documented if code)
-              assert unnamed == by_place, f"keys by place: bound {dict(unnamed)}, on the page {dict(by_place)}"
+              assert unnamed == by_place, f"{path}: keys by place: bound {dict(unnamed)}, on the page {dict(by_place)}"
               documented = {entry for entry in documented if not entry[2]}
           named = {entry for entry in bound if entry[1] or entry[2]}
-          assert documented == named, (f"bound, but not on the page: {sorted(named - documented)}; "
+          assert documented == named, (f"{path}: bound, but not on the page: {sorted(named - documented)}; "
                                        f"on the page, but not bound: {sorted(documented - named)}")
+
+      with subtest("Every shortcut (docs/shortcuts.md) lists the keys there are, and only those"):
+          shortcuts_match("${../docs/shortcuts.md}")
 
       with subtest("the keys guide's examples load, and its swipe changes the workspace"):
           guide = open("${../docs/keys.md}").read()
@@ -729,63 +745,163 @@ pkgs.testers.runNixOSTest {
           pad("fingers 3 400 0")
           eventually(lambda: active() == here, "a 3-finger swipe back did not come back")
 
-          # The whole layout at the end of the guide: its keys are there, and
-          # they do their jobs.
-          for name in ("Show / Hide the Scratchpad", "Window into / out of the Scratchpad", "Drop-down Terminal",
-                       "Next Workspace", "Screenshot of the Window", "Back to the Workspace Before"):
-              assert name in binds, f"not bound: {name}"
+          machine.succeed(f"cp /tmp/input.lua.saved {config}")
+          user("hyprctl reload")
+
+      with subtest("mysh264's setup: its keys, a key of your own, its lines, the drop-down terminal, hot corners"):
+          machine.succeed("${nodes.machine.system.build.toplevel}/specialisation/mysh264/bin/switch-to-configuration test")
+          user("hyprctl reload")
+          machine.wait_until_succeeds(
+              "su - alice -c 'XDG_RUNTIME_DIR=/run/user/1000 hyprctl -i 0 binds -j' | grep -q 'Screenshot of the Window'",
+              timeout=30,
+          )
+          errors = user("hyprctl configerrors 2>&1")
+          assert errors.strip() in ("", "no errors"), errors
+          # Every key of the setup is on its page, and nothing else.
+          shortcuts_match("${../docs/shortcuts-mysh264.md}")
+
+          def bound(mods, key):
+              return [b["description"] for b in json.loads(user("hyprctl binds -j"))
+                      if b["modmask"] == mods and b["key"].lower() == key]
+          # hyprsimple's own applications.lua binds SUPER + A and SUPER + M;
+          # the setting gives those keys other jobs, and only those.
+          assert bound(64, "a") == ["Switch This Workspace: Hyprland / i3 Layout"], bound(64, "a")
+          assert bound(64, "m") == ["Toggle Bar"], bound(64, "m")
+          assert bound(64, "d") == ["App Launcher"], bound(64, "d")
+
           # SUPER + A switches the layout, through hyprsimple_nix.jobs, and back.
           state = "/run/user/1000/hyprsimple-nix-i3-workspaces"
           def layout_of(workspace):
               lines = machine.succeed(f"cat {state} 2>/dev/null || true").splitlines()
-              return "i3" if f"{workspace} i3" in lines else "hyprland"
-          here = active()
-          before = layout_of(here)
+              if f"{workspace} i3" in lines:
+                  return "i3"
+              return "hyprland"
+          if active() == 5:
+              press("meta_l-6", 6)
+          press("meta_l-5", 5)
           machine.send_key("meta_l-a")
-          eventually(lambda: layout_of(here) != before, "SUPER + A did not switch the layout")
+          eventually(lambda: layout_of(5) == "i3", "SUPER + A did not switch workspace 5 to the i3 layout")
           machine.send_key("meta_l-a")
-          eventually(lambda: layout_of(here) == before, "SUPER + A did not switch the layout back")
+          eventually(lambda: layout_of(5) == "hyprland", "SUPER + A did not switch workspace 5 back")
           # SUPER + the workspace you are on goes back to the one before.
-          if active() == 3:
-              machine.send_key("meta_l-4")
-              eventually(lambda: active() == 4, "SUPER + 4 did not go to workspace 4")
-          machine.send_key("meta_l-3")
-          eventually(lambda: active() == 3, "SUPER + 3 did not go to workspace 3")
-          machine.send_key("meta_l-4")
-          eventually(lambda: active() == 4, "SUPER + 4 did not go to workspace 4")
-          machine.send_key("meta_l-4")
-          eventually(lambda: active() == 3, f"SUPER + 4 on workspace 4 went to {active()}, not back to 3")
+          press("meta_l-4", 4)
+          press("meta_l-3", 3)
+          press("meta_l-3", 4)
           # SUPER + TAB: the next workspace there is, and after the last, the first.
           ids = sorted(w["id"] for w in json.loads(user("hyprctl workspaces -j")) if w["id"] > 0)
           after = ids[(ids.index(active()) + 1) % len(ids)]
-          machine.send_key("meta_l-tab")
-          eventually(lambda: active() == after, f"SUPER + TAB went to {active()}, not {after}")
+          press("meta_l-tab", after)
           # SUPER + SHIFT + S hides a window in the scratchpad, SUPER + S shows
           # it, and SUPER + SHIFT + S again takes it back out.
+          # Where a window is: its workspace's name and number. (Workspace 9
+          # is called Game in this setup. Hyprland 0.57 gives a window in the
+          # scratchpad no workspace number.)
           def place(address):
               for client in json.loads(user("hyprctl clients -j")):
                   if client["address"] == address:
-                      return client["workspace"]["name"]
+                      return client["workspace"].get("name"), client["workspace"].get("id")
           def shown():
               return json.loads(user("hyprctl monitors -j"))[0]["specialWorkspace"]["name"]
-          machine.send_key("meta_l-9")
-          eventually(lambda: active() == 9, "SUPER + 9 did not go to workspace 9")
+          press("meta_l-9", 9)
           terminal()
           wait_for("length", 1, workspace=9)
           address = json.loads(user("hyprctl activewindow -j"))["address"]
           machine.send_key("meta_l-shift-s")
-          eventually(lambda: place(address) == "special:magic", f"SUPER + SHIFT + S left the window on {place(address)}")
+          eventually(lambda: place(address)[0] == "special:magic", f"SUPER + SHIFT + S left the window on {place(address)}")
           assert shown() == "", "the scratchpad came up with the window"
           machine.send_key("meta_l-s")
           eventually(lambda: shown() == "special:magic", "SUPER + S did not show the scratchpad")
           machine.send_key("meta_l-shift-s")
-          eventually(lambda: place(address) == "9", f"SUPER + SHIFT + S left the window on {place(address)}")
+          eventually(lambda: place(address)[1] == 9 or place(address)[0] in ("9", "Game"),
+                     f"SUPER + SHIFT + S left the window on {place(address)}")
           eventually(lambda: shown() == "", "the empty scratchpad stayed on the screen")
           machine.send_key("meta_l-q")
           wait_for("length", 0, workspace=9)
 
-          machine.succeed(f"cp /tmp/input.lua.saved {config}")
+          # A key of your own wins over the setting's: SUPER + D is yours alone.
+          # And a line of yours for SUPER + M, word for word like hyprsimple's
+          # (which comes first in the file and is left out), wins too.
+          apps = "/home/alice/.config/hypr/bindings/applications.lua"
+          machine.succeed(f"cp {apps} /tmp/applications.lua.saved")
+          machine.succeed(f"cat >> {apps} <<'MINE'\n"
+                          'hl.bind("SUPER + D", hl.dsp.exec_cmd("true"), { description = "Mine" })\n'
+                          'hl.bind("SUPER + M", hl.dsp.exec_cmd("sh -c \'hyprpicker | wl-copy\'"), { description = "Color Picker" })\n'
+                          "MINE")
           user("hyprctl reload")
+          eventually(lambda: bound(64, "d") == ["Mine"], f"SUPER + D: {bound(64, 'd')}")
+          assert bound(64, "m") == ["Color Picker"], bound(64, "m")
+          assert bound(64, "a") == ["Switch This Workspace: Hyprland / i3 Layout"], bound(64, "a")
+          machine.succeed(f"cp /tmp/applications.lua.saved {apps}")
+          user("hyprctl reload")
+          eventually(lambda: bound(64, "m") == ["Toggle Bar"], f"SUPER + M after the reload: {bound(64, 'm')}")
+
+          # Its own lines (extraConfig): 3-pixel borders.
+          border = json.loads(user("hyprctl getoption general:border_size -j"))
+          assert 3 in border.values(), f"general:border_size: {border}"
+
+          # The drop-down terminal, on the number pad's dot. It needs Ghostty
+          # 1.4 (ghostty +toggle-quick-terminal), which NixOS 26.05 has not.
+          def layer(namespace):
+              for monitor in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor["levels"].values():
+                      for found in layers:
+                          if found["namespace"] == namespace:
+                              return found
+          if ${if lib.versionAtLeast pkgs.ghostty.version "1.4" then "True" else "False"}:
+              machine.send_key("kp_decimal")
+              eventually(lambda: layer("ghostty-quick-terminal") is not None, "the drop-down terminal did not come down", timeout=60)
+              machine.sleep(2)
+              machine.screenshot("dropdown-terminal")
+              machine.send_key("kp_decimal")
+              eventually(lambda: layer("ghostty-quick-terminal") is None, "the drop-down terminal did not go away")
+
+          # Hot corners. The pointer goes into a corner, and back to the middle.
+          monitor = json.loads(user("hyprctl monitors -j"))[0]
+          width = round(monitor["width"] / monitor["scale"])
+          height = round(monitor["height"] / monitor["scale"])
+          def pointer(x, y):
+              user(f"hyprctl dispatch 'hl.dsp.cursor.move({{ x = {x}, y = {y} }})'")
+          def middle():
+              pointer(width // 2, height // 2)
+              machine.sleep(1)
+          # The bar: its layer spans the screen (a notification's is narrow).
+          def full_bar():
+              for monitor_layers in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor_layers["levels"].values():
+                      for candidate in layers:
+                          if candidate["namespace"] == "quickshell" and candidate["w"] > width // 2:
+                              return candidate
+          middle()
+          assert full_bar() is not None, "no bar before the corners"
+          # Top left: the bar hides, and the same corner shows it again.
+          pointer(0, 0)
+          eventually(lambda: full_bar() is None, "the top left corner did not hide the bar")
+          middle()
+          pointer(0, 0)
+          eventually(lambda: full_bar() is not None, "the top left corner did not show the bar again")
+          middle()
+          # Top right: the desktop, an empty workspace, and there again, back.
+          press("meta_l-2", 2)
+          pointer(width - 1, 0)
+          eventually(lambda: active() == 97, f"the top right corner went to {active()}, not to the desktop")
+          middle()
+          pointer(width - 1, 0)
+          eventually(lambda: active() == 2, f"the top right corner went to {active()}, not back to 2")
+          middle()
+          # Bottom right: back to the workspace before.
+          press("meta_l-4", 4)
+          pointer(width - 1, height - 1)
+          eventually(lambda: active() == 2, f"the bottom right corner went to {active()}, not back to 2")
+          middle()
+
+          # The prayer time's place, from the NixOS configuration: an update
+          # puts it back on the right.
+          user("f=~/.config/hyprsimple/plugins.json && jq '.plugins.muslimtify.placement = \"left\"' \"$f\" > \"$f.new\" && mv \"$f.new\" \"$f\"")
+          out = user("hyprsimple-update 2>&1")
+          print(out)
+          assert "The prayer time is now on the right of the bar" in out, "the update did not move the prayer time"
+          user("jq -e '.plugins.muslimtify.placement == \"right\"' ~/.config/hyprsimple/plugins.json")
+          press("meta_l-1", 1)
 
       with subtest("after logging out and in, the bar is at the bottom with even workspaces, and opens upwards"):
           machine.succeed("grep -Eq 'HYPRSIMPLE_BAR +DEFAULT=\"bottom\"' /etc/pam/environment")
@@ -825,6 +941,24 @@ pkgs.testers.runNixOSTest {
           monitor = json.loads(user("hyprctl monitors -j"))[0]
           eventually(lambda: (bar_layer() or {}).get("y", 0) > 0 and bar_layer()["y"] + bar_layer()["h"] == monitor["height"],
                      f"the bar is not at the bottom: {bar_layer()}")
+          # mysh264's setup starts the Conky panel with the session, from the
+          # user's own copy, which can be changed, with its font in place.
+          eventually(lambda: machine.execute("pgrep -u alice -x conky")[0] == 0, "Conky did not start", timeout=60)
+          user("test -w ~/.config/lean-conky-config/conky.conf && test -f ~/.config/lean-conky-config/local.conf.example")
+          user("test -L ~/.local/share/fonts/lean-conky-config.otf && test -e ~/.local/share/fonts/lean-conky-config.otf")
+          def conky_layer():
+              for monitor_layers in json.loads(user("hyprctl layers -j")).values():
+                  for layers in monitor_layers["levels"].values():
+                      for found in layers:
+                          # "conky" from Conky 1.25 on, "conky_namespace" before.
+                          if found["namespace"] in ("conky", "conky_namespace"):
+                              return found
+          try:
+              eventually(lambda: conky_layer() is not None, "the Conky panel is not on the screen", timeout=60)
+          except Exception:
+              print(user("journalctl --user -b --no-pager | grep -iE 'conky|lcc' | tail -n 40", check=False)[1])
+              raise
+          print("the Conky panel:", conky_layer())
           machine.sleep(3)
           machine.screenshot("bar-after-login")
           panel = "qs -p ~/.local/share/hyprsimple/default/quickshell ipc call bar toggle "
@@ -923,6 +1057,9 @@ pkgs.testers.runNixOSTest {
           out = user("printf 'yes\\n' | script -qec hyprsimple-uninstall.sh /dev/null 2>&1", check=False)[1]
           print(out)
           assert "Done. Log out now" in out, "the remover did not finish"
+          # muslimtify, removed with the plugin, names the NixOS setting.
+          assert "sudo ./uninstall.sh" not in out, "muslimtify still points to an uninstall.sh"
+          assert "programs.hyprsimple.muslimtify.enable = false" in out, "muslimtify did not name the NixOS setting"
           assert "come from your NixOS configuration" in out and "uninstall.md#part-2-for-the-computer" in out, \
               "the remover did not send the reader to Part 2 for the NixOS configuration"
           print(user("uwsm stop 2>&1", check=False)[1])

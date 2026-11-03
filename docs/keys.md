@@ -7,11 +7,17 @@ touchpad do. Everything here goes in files in your home folder:
 |---|---|
 | Keys and mouse buttons | `~/.config/hypr/bindings/applications.lua` |
 | Touchpad and mouse settings, and touchpad swipes | `~/.config/hypr/input.lua` |
-| How the drop-down terminal slides in | `~/.config/hypr/looknfeel.lua` |
 
-You do not rebuild NixOS for these. A few keys are also ready-made NixOS
-settings: [keys for workspaces 11 and 12](settings.md#keys-for-workspaces-11-and-12)
-and [the number pad](settings.md#the-number-pad).
+You do not rebuild NixOS for these. Some keys are also ready-made NixOS
+settings: [keys for workspaces 11 and 12](settings.md#keys-for-workspaces-11-and-12),
+[the number pad](settings.md#the-number-pad),
+[a drop-down terminal](settings.md#a-drop-down-terminal),
+[keys in i3's style](settings.md#keys-in-i3s-style), and
+[hot corners](corners.md) for the mouse.
+
+> 💡 A file in `~/.config/hypr` stays on the computer where you wrote it. To
+> have a line on every computer of yours, also after a new install, put it in
+> [your NixOS configuration](settings.md#your-own-lines-for-hyprland) instead.
 
 To see every key you have now, press **SUPER + /**. Every key, button and
 swipe a new hyprsimple has is in [Every shortcut](shortcuts.md).
@@ -23,7 +29,7 @@ swipe a new hyprsimple has is in [Every shortcut](shortcuts.md).
 [The touchpad](#the-touchpad) ·
 [The number pad, by hand](#the-number-pad-by-hand) ·
 [A drop-down terminal](#a-drop-down-terminal) ·
-[A whole layout of your own: an example](#a-whole-layout-of-your-own-an-example)
+[A whole layout: keys in i3's style](#a-whole-layout-keys-in-i3s-style)
 
 ---
 
@@ -138,9 +144,11 @@ matter. [Every shortcut](shortcuts.md) shows each key the way to write it.
 ### Keys that come from your NixOS settings
 
 The keys of [window groups](settings.md#window-groups-tabs),
-[the i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) and
-[the number pad](settings.md#the-number-pad) do jobs that have names. To
-give a job another key, use its name:
+[the i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3),
+[the number pad](settings.md#the-number-pad),
+[the drop-down terminal](settings.md#a-drop-down-terminal) and
+[keys in i3's style](settings.md#keys-in-i3s-style) do jobs that have names.
+To give a job another key, use its name:
 
 ```lua
 hl.bind("SUPER + Y", hyprsimple_nix.jobs.switch_layout, { description = "Switch This Workspace: Hyprland / i3 Layout" })
@@ -149,6 +157,19 @@ hl.bind("SUPER + Y", hyprsimple_nix.jobs.switch_layout, { description = "Switch 
 Now **SUPER + Y** does what **SUPER + CTRL + SPACE** does. To take it away
 from SUPER + CTRL + SPACE, add `hl.unbind("SUPER + CTRL + SPACE")` above
 that line.
+
+**A key of yours wins.** When your file binds a key that one of these
+settings binds too, the setting's job on it steps aside: the key does yours,
+and only yours. You need no `hl.unbind` for that:
+
+```lua
+hl.bind("SUPER + G", hl.dsp.exec_cmd("gimp"), { description = "GIMP" })
+```
+
+Here **SUPER + G** opens GIMP, also with window groups on. (Keys of
+hyprsimple's own, in [Every shortcut](shortcuts.md) without a setting named,
+still need `hl.unbind` first, as in
+[Change a key that already does something](#change-a-key-that-already-does-something).)
 
 | Name | What it does | Its key now |
 |---|---|---|
@@ -164,9 +185,17 @@ that line.
 | `tab_1` … `tab_9` | Window 1 … 9 of the group, or tab | SUPER + ALT + 1 … 9 |
 | `move_left`, `move_right`, `move_up`, `move_down` | Moves the window that way, in both layouts | 7 and 9 on the number pad |
 | `first_workspace`, `last_workspace` | The first or the last workspace with windows | 8 and 2 on the number pad |
+| `dropdown_terminal` | Slides the drop-down terminal down, or away | F12, with the drop-down terminal on |
+| `workspace_before` | Back to the workspace you were on before | the mouse's back button, with keys in i3's style |
+| `show_desktop` | An empty workspace, which shows the desktop; there again, back | the top right [hot corner](corners.md) |
+| `toggle_bar` | Hides the bar, or shows it again | CTRL + ESC (and SUPER + M with keys in i3's style) |
+| `scratchpad` | Shows or hides the scratchpad | SUPER + S, with keys in i3's style |
+| `terminal`, `launcher` | Opens a terminal, or the app launcher | SUPER + T, and SUPER + D with keys in i3's style |
+| `notifications`, `lock`, `power_menu` | The notifications panel, the lock screen, the power menu | SUPER + SHIFT + D, SUPER + SHIFT + L, SUPER + ESC |
 
 Every name is there, whatever your settings: one whose setting is off does
-nothing, so your keys never stop the file from loading.
+nothing, so your keys never stop the file from loading. The same jobs work in
+[hot corners](corners.md#anything-at-all-in-lua).
 
 ---
 
@@ -402,29 +431,22 @@ and no longer types its number.
 
 ## A drop-down terminal
 
-Ghostty, the terminal hyprsimple uses, has a drop-down terminal of its own.
-One key slides it down from the top of the screen, over your windows, and
-the same key slides it away again. What you typed in it stays there.
+A key slides a terminal down from the top of the screen, over your windows,
+and the same key slides it away again. Turn it on in your NixOS
+configuration: [A drop-down terminal](settings.md#a-drop-down-terminal). It
+comes on **F12**, slides in with what is behind it blurred, and the setting
+can give it other keys. It needs Ghostty 1.4 or newer (nixos-unstable has
+it; NixOS 26.05 does not yet).
 
-Give it a key, in `~/.config/hypr/bindings/applications.lua`:
-
-```lua
-hl.bind("F12", hl.dsp.exec_cmd("sh -c 'systemctl --user start app-com.mitchellh.ghostty.service && ghostty +toggle-quick-terminal'"), { description = "Drop-down Terminal" })
-```
-
-The first part starts Ghostty in the background, the first time you press the
-key. Without it, that very first press opens an ordinary Ghostty window
-instead.
-
-To have it slide down, with what is behind it blurred, add this to
-`~/.config/hypr/looknfeel.lua`:
+To put it on a key here instead, use its job:
 
 ```lua
-hl.layer_rule({ match = { namespace = "ghostty-quick-terminal" }, blur = true, ignore_alpha = 0.1, animation = "slide top" })
+hl.bind("SUPER + GRAVE", hyprsimple_nix.jobs.dropdown_terminal, { description = "Drop-down Terminal" })
 ```
 
-Its size, and whether it slides away by itself when you click somewhere
-else, are Ghostty settings. They go in `~/.config/ghostty/config`:
+**SUPER + GRAVE** is SUPER and the key left of 1. The drop-down itself is
+Ghostty's: its size, and whether it slides away by itself when you click
+somewhere else, are Ghostty settings, in `~/.config/ghostty/config`:
 
 ```
 quick-terminal-size = 50%
@@ -433,142 +455,34 @@ quick-terminal-autohide = true
 
 ---
 
-## A whole layout of your own: an example
+## A whole layout: keys in i3's style
 
-This is one i3 user's layout. It moves many keys at once, so it shows every
-way of doing it: keys taken away with `hl.unbind`, hyprsimple's jobs on
-other keys, jobs [by name](#keys-that-come-from-your-nixos-settings), new
-keys, and the mouse's side buttons. Copy what you like.
+Many keys moved at once, the way an i3 user (the maintainer of hyprsimple-nix)
+has them: SUPER + arrows move the focus, SUPER + ENTER opens a terminal,
+SUPER + D the app launcher, SUPER + TAB goes through the workspaces, and more.
+It is one setting:
 
-| Keys | What they do now | Before |
-|---|---|---|
-| **SUPER + ←, →, ↑, ↓** | Focus the window that way | SUPER + H, L, K, J |
-| **SUPER + CTRL + arrows** | Window bigger or smaller | SUPER + SHIFT + arrows |
-| **SUPER + SHIFT + arrows** | Move the window into a group (i3 layout: move it) | SUPER + ALT + arrows |
-| **SUPER + ALT + arrows** | Move the workspace to another screen | SUPER + CTRL + arrows |
-| **SUPER + ENTER** | Terminal (SUPER + T still works too) | nothing |
-| **SUPER + D** | App launcher | SUPER + A |
-| **SUPER + P** | Colour picker | SUPER + M |
-| **SUPER + Z** | Float the window, or tile it again | SUPER + W |
-| **SUPER + SHIFT + F** | Fullscreen, and back | nothing |
-| **SUPER + TAB**, **SUPER + SHIFT + TAB** | Next or previous workspace, and round again | nothing |
-| **SUPER + S** | Show or hide the scratchpad | sound panel |
-| **SUPER + SHIFT + S** | The window into the scratchpad, or back out of it | into the scratchpad |
-| **SUPER + SHIFT + G** | Take the window out of its group | SUPER + ALT + G |
-| **SUPER + A** | Switch the workspace: Hyprland's layout or i3's | SUPER + CTRL + SPACE |
-| **SUPER + H**, **SUPER + J**, **SUPER + E** | i3 layout: next window beside, below, turn the split | SUPER + CTRL + H, J, E |
-| **SUPER + SHIFT + A** | Sound panel | SUPER + S |
-| **SUPER + ALT + D** | Notifications panel | SUPER + SHIFT + D |
-| **SUPER + SHIFT + D** | Clear the notifications | SUPER + D |
-| **SUPER + SHIFT + E** | Power menu (SUPER + ESC still works too) | nothing |
-| **SUPER + L** | Lock the screen | SUPER + SHIFT + L |
-| **SUPER + M** | Hide or show the bar (CTRL + ESC still works too) | colour picker |
-| **SUPER + PRINT** | Screenshot of the whole screen, at once | nothing |
-| **SHIFT + PRINT** | Screenshot of the window you are in, at once | nothing |
-| **. on the number pad**, mouse **forward** button | [Drop-down terminal](#a-drop-down-terminal) | nothing |
-| mouse **back** button | Back to the workspace you were on | nothing |
-| **SUPER + X** | Nothing (the power menu has Log out) | log out |
+```nix
+  programs.hyprsimple.keys.i3Style.enable = true;
+```
 
-And **SUPER + a workspace's number**, or a click on its name on the bar,
-takes you back to the workspace before when you are on it already, like i3's
-`workspace_auto_back_and_forth`.
+* [Keys in i3's style](settings.md#keys-in-i3s-style) shows every key it
+  moves, and what each did before.
+* [Every shortcut in mysh264's setup](shortcuts-mysh264.md) lists every key
+  you then have, one on each line.
+* Its code is in [`modules/hyprland.lua`](../modules/hyprland.lua), in "Keys
+  in i3's style": read it as an example of a whole layout, written with the
+  same `hl.bind` and `hl.unbind` lines as this page.
 
-It needs [window groups](settings.md#window-groups-tabs) and
-[the i3 layout](settings.md#the-i3-layout-tabs-and-splits-like-i3) on, and
-the [drop-down terminal](#a-drop-down-terminal)'s slide comes from its
-`looknfeel.lua` line. Put the whole block at the end of
-`~/.config/hypr/bindings/applications.lua`, then `hyprctl reload`:
+**Change one of its keys** in `~/.config/hypr/bindings/applications.lua`. A
+key of yours wins over the setting's, so one line is enough. For example, the
+colour picker back on **SUPER + M**, and hiding the bar on **SUPER + B**:
 
 ```lua
--- An i3 user's keys. The keys this block gives a new job are taken away from
--- their old one first, so no key does two things.
-local vars = require("default.hypr.vars")
-local jobs = hyprsimple_nix.jobs
-local home = os.getenv("HOME")
-local shots = home .. "/Pictures/Screenshots"
-
-for _, keys in ipairs({
-  "SUPER + A", "SUPER + M", "SUPER + W", "SUPER + D", "SUPER + S", "SUPER + X",
-  "SUPER + H", "SUPER + J", "SUPER + K", "SUPER + L",
-  "SUPER + SHIFT + RIGHT", "SUPER + SHIFT + LEFT", "SUPER + SHIFT + UP", "SUPER + SHIFT + DOWN",
-  "SUPER + CTRL + LEFT", "SUPER + CTRL + RIGHT", "SUPER + CTRL + UP", "SUPER + CTRL + DOWN",
-  "SUPER + SHIFT + S", "SUPER + SHIFT + L", "SUPER + SHIFT + D",
-  "SUPER + ALT + G", "SUPER + ALT + LEFT", "SUPER + ALT + RIGHT", "SUPER + ALT + UP", "SUPER + ALT + DOWN",
-  "SUPER + ALT + H", "SUPER + ALT + L", "SUPER + ALT + K", "SUPER + ALT + J",
-  "SUPER + ALT + TAB", "SUPER + ALT + SHIFT + TAB",
-  "SUPER + CTRL + SPACE", "SUPER + CTRL + H", "SUPER + CTRL + J", "SUPER + CTRL + E",
-}) do
-  hl.unbind(keys)
-end
-
--- Apps.
-hl.bind("SUPER + Return", hl.dsp.exec_cmd(vars.terminal), { description = "Terminal" })
-hl.bind("SUPER + D", hl.dsp.exec_cmd(vars.menu), { description = "App Launcher" })
-hl.bind("SUPER + P", hl.dsp.exec_cmd("sh -c '" .. vars.colorPicker .. " | wl-copy'"), { description = "Color Picker" })
-
--- Windows.
-hl.bind("SUPER + Z", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle Floating" })
-hl.bind("SUPER + SHIFT + F", hl.dsp.window.fullscreen(), { description = "Fullscreen" })
-hl.bind("SUPER + Left", jobs.focus_left, { description = "Focus Left" })
-hl.bind("SUPER + Right", jobs.focus_right, { description = "Focus Right" })
-hl.bind("SUPER + Up", jobs.focus_up, { description = "Focus Up" })
-hl.bind("SUPER + Down", jobs.focus_down, { description = "Focus Down" })
-hl.bind("SUPER + CTRL + Right", hl.dsp.window.resize({ x = 30, y = 0, relative = true }), { description = "Resize Right", repeating = true })
-hl.bind("SUPER + CTRL + Left", hl.dsp.window.resize({ x = -30, y = 0, relative = true }), { description = "Resize Left", repeating = true })
-hl.bind("SUPER + CTRL + Up", hl.dsp.window.resize({ x = 0, y = -30, relative = true }), { description = "Resize Up", repeating = true })
-hl.bind("SUPER + CTRL + Down", hl.dsp.window.resize({ x = 0, y = 30, relative = true }), { description = "Resize Down", repeating = true })
-
--- Workspaces. SUPER + TAB goes round: after the last workspace, the first.
-hl.bind("SUPER + Tab", hl.dsp.focus({ workspace = "e+1" }), { description = "Next Workspace" })
-hl.bind("SUPER + SHIFT + Tab", hl.dsp.focus({ workspace = "e-1" }), { description = "Previous Workspace" })
-hl.bind("SUPER + S", hl.dsp.workspace.toggle_special("magic"), { description = "Show / Hide the Scratchpad" })
-hl.bind("SUPER + SHIFT + S", function()
-  local window = hl.get_active_window()
-  if not window then
-    return
-  end
-  if window.workspace and window.workspace.special then
-    local here = hl.get_active_workspace()
-    if here then
-      hl.dispatch(hl.dsp.window.move({ workspace = tostring(here.id) }))
-    end
-  else
-    hl.dispatch(hl.dsp.window.move({ workspace = "special:magic", follow = false }))
-  end
-end, { description = "Window into / out of the Scratchpad" })
-for _, way in ipairs({ { "Left", "l" }, { "Right", "r" }, { "Up", "u" }, { "Down", "d" } }) do
-  hl.bind("SUPER + ALT + " .. way[1], hl.dsp.workspace.move({ monitor = way[2] }), { description = "Move Workspace to " .. way[1] .. " Monitor" })
-end
--- SUPER + the workspace you are on, or a click on it on the bar, goes back to
--- the one before, like i3's workspace_auto_back_and_forth.
-hl.config({ binds = { workspace_back_and_forth = true } })
-
--- Window groups and the i3 layout.
-hl.bind("SUPER + SHIFT + G", jobs.leave_group, { description = "Take Window out of Group" })
-hl.bind("SUPER + SHIFT + Left", jobs.into_group_left, { description = "Move Window into Group Left (i3 layout: Move Window Left)" })
-hl.bind("SUPER + SHIFT + Right", jobs.into_group_right, { description = "Move Window into Group Right (i3 layout: Move Window Right)" })
-hl.bind("SUPER + SHIFT + Up", jobs.into_group_up, { description = "Move Window into Group Up (i3 layout: Move Window Up)" })
-hl.bind("SUPER + SHIFT + Down", jobs.into_group_down, { description = "Move Window into Group Down (i3 layout: Move Window Down)" })
-hl.bind("SUPER + A", jobs.switch_layout, { description = "Switch This Workspace: Hyprland / i3 Layout" })
-hl.bind("SUPER + H", jobs.next_beside, { description = "i3 Layout: Next Window Beside" })
-hl.bind("SUPER + J", jobs.next_below, { description = "i3 Layout: Next Window Below" })
-hl.bind("SUPER + E", jobs.turn_split, { description = "i3 Layout: Turn the Split" })
-
--- Panels on the bar, and the system.
-hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd(vars.barPanel .. "volume"), { description = "Sound (panel: volume and output device)" })
-hl.bind("SUPER + ALT + D", hl.dsp.exec_cmd(vars.barPanel .. "notifications"), { description = "Notifications (panel)" })
-hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd(home .. "/.local/bin/notification-dismiss.sh"), { description = "Dismiss Notifications" })
-hl.bind("SUPER + SHIFT + E", hl.dsp.exec_cmd(vars.powermenu), { description = "Power Menu" })
-hl.bind("SUPER + L", hl.dsp.exec_cmd("hyprlock"), { description = "Lock Screen" })
-hl.bind("SUPER + M", hl.dsp.exec_cmd(home .. "/.local/bin/hyprsimple-restart-bar.sh --toggle"), { description = "Toggle Bar" })
-hl.bind("SUPER + Print", hl.dsp.exec_cmd("hyprshot -m output -m active --output-folder " .. shots), { description = "Screenshot of the Whole Screen" })
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd("hyprshot -m window -m active --output-folder " .. shots), { description = "Screenshot of the Window" })
-
--- The drop-down terminal (see "A drop-down terminal"), and the side buttons
--- of the mouse: forward for the drop-down terminal, back for the workspace
--- before.
-local dropdown = hl.dsp.exec_cmd("sh -c 'systemctl --user start app-com.mitchellh.ghostty.service && ghostty +toggle-quick-terminal'")
-hl.bind("code:91", dropdown, { description = "Drop-down Terminal" })
-hl.bind("mouse:276", dropdown, { description = "Drop-down Terminal" })
-hl.bind("mouse:275", hl.dsp.focus({ workspace = "previous" }), { description = "Back to the Workspace Before" })
+-- The colour picker back on SUPER + M: a key of the setting, so one line.
+hl.bind("SUPER + M", hl.dsp.exec_cmd("sh -c 'hyprpicker | wl-copy'"), { description = "Color Picker" })
+-- Hiding the bar on SUPER + B: a key of hyprsimple's own (the browser), so
+-- its old job goes first.
+hl.unbind("SUPER + B")
+hl.bind("SUPER + B", hyprsimple_nix.jobs.toggle_bar, { description = "Toggle Bar" })
 ```

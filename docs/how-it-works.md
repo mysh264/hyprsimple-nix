@@ -63,7 +63,18 @@ describes parts 1 and 2 the NixOS way:
   written with your settings to `/etc/hyprsimple/hyprland.lua`, which
   hyprsimple's own config loads. The jobs its keys do are also in a table,
   `hyprsimple_nix.jobs`, so your own keys can do them
-  ([keys guide](keys.md#keys-that-come-from-your-nixos-settings)).
+  ([keys guide](keys.md#keys-that-come-from-your-nixos-settings)). The same
+  file has the keys in i3's style (`programs.hyprsimple.keys.i3Style`), the
+  drop-down terminal (`dropdownTerminal`), the hot corners (`corners`: a
+  timer looks where the pointer is 20 times a second, as Hyprland has no
+  corner event) and the start of the Conky panel (`conky`), and then your
+  own lines (`extraConfig`). It ends by wrapping `hl.bind` for the files
+  that load after it: when one of yours binds a key a setting bound too, the
+  setting's bind steps aside, so your key does your job alone.
+- **A whole setup in one file:** [`profiles/mysh264.nix`](../profiles/mysh264.nix)
+  is the maintainer's, every setting chosen with `lib.mkDefault`, so a line
+  of yours wins. It imports the module itself, so one line in `imports`
+  brings both ([mysh264's setup](mysh264.md)).
 
 It also puts a few files in `/etc/hyprsimple`, for the tools below:
 
@@ -86,7 +97,7 @@ NixOS:
   keeps those things.
 - Two user services had a hard-coded list of folders to look for programs
   in. On NixOS those folders are empty, so the list is replaced.
-- Eleven small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
+- Thirteen small patches, in [`pkgs/hyprsimple/patches`](../pkgs/hyprsimple/patches).
   Numbers 1 to 4, 6 and 7 only do something when `/etc/hyprsimple` exists, so
   hyprsimple on Arch would behave exactly as before:
   1. `hyprsimple-update` takes the new version from your NixOS
@@ -122,6 +133,15 @@ NixOS:
      Kvantum's Adwaita (KvGnome, or KvGnomeDark for a dark theme), the twin
      of the GTK theme. A Kvantum theme you chose yourself stays. This one
      fixes a bug that also happens on Arch.
+  12. The theme switcher and the live wallpaper give `hyprctl`'s requests to
+     hyprpaper 3 seconds. `hyprctl` waits forever for an answer from a
+     hyprpaper that went away in the middle of answering, and then the theme
+     switch never finished. This one fixes a bug that also happens on Arch.
+  13. `hyprsimple-uninstall.sh`, hyprsimple's remover, says on NixOS that
+     packages and system settings come from your NixOS configuration, and
+     points to Part 2 of the [removal guide](uninstall.md). It deletes
+     `~/.local/share/hyprsimple` only when that holds nothing of yours, and
+     keeps work you put in `git stash` there, on Arch too.
 
 Every change is checked when the package builds. If a new hyprsimple version
 moves something, the build fails and says which change no longer fits,
@@ -184,7 +204,9 @@ hyprsimple-nix fixes both.
   `/run/current-system/sw/bin/muslimtify`. The second fixes a muslimtify bug:
   it found a time zone in `/etc/zoneinfo` (where NixOS keeps them), but read
   its offset only from `/usr/share/zoneinfo`, so without `TZDIR` every zone
-  was "UTC+0.0" and prayer times were hours off.
+  was "UTC+0.0" and prayer times were hours off. The third makes
+  `muslimtify daemon uninstall` (which the remover runs) name the NixOS
+  setting, instead of an `uninstall.sh` NixOS does not have.
 - **Viewnior, mended** (with `programs.hyprsimple.viewnior.enable`):
   nixpkgs' Viewnior, with two patches. Viewnior only read scrolling that
   comes in clicks, like a mouse wheel's. On Wayland, GTK passes a touchpad's
@@ -198,6 +220,16 @@ hyprsimple-nix fixes both.
 - **Quickshell**, which draws the bar, comes from NixOS but is wrapped in
   two ways: it can show webp pictures (most wallpapers are webp), and it
   keeps the name `qs`, which hyprsimple uses to find its bar.
+- **Lean Conky Config** (with `programs.hyprsimple.conky.enable`), Jason
+  Xu's Conky panel, from its Wayland version,
+  [lean-conky-config-wayland](https://github.com/mysh264/lean-conky-config-wayland):
+  the original with one line for Wayland, one fix for Lua 5.5 (the Lua of
+  nixos-unstable's Conky), and everything a new computer needs. That
+  repository packages itself in `nix/package.nix`;
+  [`pkgs/lean-conky-config`](../pkgs/lean-conky-config/default.nix) only
+  picks its version. Its `lean-conky-config` command copies the panel to
+  `~/.config/lean-conky-config` the first time, so you can change it, and
+  starts it with Conky, Python and the rest on its PATH.
 
 ## How it is tested
 
@@ -212,8 +244,12 @@ nix flake check   # the virtual machine test needs KVM
 - **Scripts** pass shellcheck, and every hyprsimple script still parses
   after the changes.
 - **Whole systems** with the module, with the
-  [template](../templates/default), and with every `gpu.nix` from
-  [`tests/gpu`](../tests/gpu) evaluate without errors.
+  [template](../templates/default), with [mysh264's setup](mysh264.md), and
+  with every `gpu.nix` from [`tests/gpu`](../tests/gpu) evaluate without
+  errors.
+- **The Lua** the module writes to `/etc/hyprsimple/hyprland.lua` runs in
+  the system's own Hyprland (`Hyprland --verify-config`), with no setting
+  on, with mysh264's setup, and with every setting on.
 - **`hyprsimple-nixos gpu`** writes exactly the expected `gpu.nix` for 13
   example computers, and the [graphics guide](gpu.md) shows those files as
   the tool writes them.
@@ -236,19 +272,27 @@ nix flake check   # the virtual machine test needs KVM
   and that SUPER + CTRL + SPACE switches a workspace, also through a reload;
   checks that an app opens on its own workspace; presses the keys for
   workspaces 11 and 12 and every number pad key; zooms in Viewnior with a
-  pretend touchpad (and checks that a wheel click is one step); loads every
-  example in the [keys guide](keys.md) and swipes with three fingers, then
-  presses the keys of its example layout (the i3 layout switch by its job's
-  name, back and forth between workspaces, SUPER + TAB, the scratchpad in and
-  out); checks that [Every shortcut](shortcuts.md) lists exactly the keys
-  Hyprland has; logs out and in again and checks that the bar got its
-  settings from the new login, at the bottom, and opens a panel and a
-  notification there; runs `hyprsimple-update`
+  pretend touchpad (and checks that a wheel click is one step); checks that
+  [Every shortcut](shortcuts.md) lists exactly the keys Hyprland has; loads
+  every example in the [keys guide](keys.md) and swipes with three fingers;
+  switches to [mysh264's setup](mysh264.md) with a rebuild, checks that
+  [its page of keys](shortcuts-mysh264.md) lists exactly its keys, and
+  presses them (the i3 layout switch by its job's name, back and forth
+  between workspaces, SUPER + TAB, the scratchpad in and out); checks that a
+  key of the user's own wins over the setting's, and that the lines of
+  hyprsimple's own `applications.lua` whose keys it moved are left out; brings
+  the drop-down terminal down and away (with Ghostty 1.4); pushes the pointer
+  into three hot corners and checks that each does its job; moves the prayer
+  time with `hyprsimple-update`; logs out and in again and checks that the
+  bar got its settings from the new login, at the bottom, and opens a panel
+  and a notification there, and that the Conky panel started, from the
+  user's own copy, with its font; runs `hyprsimple-update`
   with nothing new (repairing a service tied to `/nix/store` on the way) and
   then with a changed version; logs in again through the
   "Hyprsimple" login entry; and finally follows the
   [removal guide](uninstall.md), answering hyprsimple's remover in a
-  terminal, and checks that the old settings came back.
+  terminal, and checks that the old settings came back, and that muslimtify
+  names the NixOS setting that removes it.
 
 All of this runs on every change, on both NixOS 26.05 and nixos-unstable.
 
@@ -288,9 +332,11 @@ checks. To finish it, or to do it by hand:
 | `flake.nix` | the entry point: module, packages, checks, template |
 | `modules/nixos.nix` | the NixOS module |
 | `modules/arch-packages.nix` | Arch package → NixOS package |
+| `modules/hyprland.lua` | what the settings add to Hyprland: keys, corners, the Conky panel's start |
+| `profiles/mysh264.nix` | the maintainer's whole setup |
 | `pkgs/hyprsimple/` | hyprsimple for NixOS, its patches, and the `hyprsimple-*` tools |
 | `pkgs/hyprsimple/gpu/` | the pieces `hyprsimple-nixos gpu` builds `gpu.nix` from |
-| `pkgs/hyprqt6engine/`, `pkgs/muslimtify/`, `pkgs/quickshell/`, `pkgs/viewnior/` | the extra packages |
+| `pkgs/hyprqt6engine/`, `pkgs/lean-conky-config/`, `pkgs/muslimtify/`, `pkgs/quickshell/`, `pkgs/viewnior/` | the extra packages |
 | `templates/default/` | a starting configuration for new machines |
 | `tests/` | all the checks above |
 | `docs/` | these guides |

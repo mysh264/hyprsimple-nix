@@ -286,6 +286,108 @@ Have both this and window groups on? The same keys (**SUPER + G**,
 **SUPER + ALT + ...**) work Hyprland's groups on a Hyprland workspace, and
 i3's tabs on an i3 workspace. **SUPER + /** says both.
 
+### Keys in i3's style
+
+```nix
+  programs.hyprsimple.keys.i3Style.enable = true;
+```
+
+The keys of an i3 user: the maintainer of hyprsimple-nix. Many keys move to
+where i3 has them:
+
+| Keys | What they do now | Before |
+|---|---|---|
+| **SUPER + ←, →, ↑, ↓** | Focus the window that way | SUPER + H, L, K, J |
+| **SUPER + CTRL + arrows** | Window bigger or smaller | SUPER + SHIFT + arrows |
+| **SUPER + SHIFT + arrows** | Move the window into a group (i3 layout: move it) | SUPER + ALT + arrows |
+| **SUPER + ALT + arrows** | Move the workspace to another screen | SUPER + CTRL + arrows |
+| **SUPER + ENTER** | Terminal (SUPER + T still works too) | nothing |
+| **SUPER + D** | App launcher | SUPER + A |
+| **SUPER + P** | Colour picker | SUPER + M |
+| **SUPER + Z** | Float the window, or tile it again | SUPER + W |
+| **SUPER + SHIFT + F** | Full screen, and back | nothing |
+| **SUPER + TAB**, **SUPER + SHIFT + TAB** | Next or previous workspace, and round again | nothing |
+| **SUPER + S** | Show or hide the scratchpad | sound panel |
+| **SUPER + SHIFT + S** | The window into the scratchpad, or back out of it | into the scratchpad |
+| **SUPER + SHIFT + G** | Take the window out of its group | SUPER + ALT + G |
+| **SUPER + A** | Switch the workspace: Hyprland's layout or i3's | SUPER + CTRL + SPACE |
+| **SUPER + H**, **SUPER + J**, **SUPER + E** | i3 layout: next window beside, below, turn the split | SUPER + CTRL + H, J, E |
+| **SUPER + SHIFT + A** | Sound panel | SUPER + S |
+| **SUPER + ALT + D** | Notifications panel | SUPER + SHIFT + D |
+| **SUPER + SHIFT + D** | Clear the notifications | SUPER + D |
+| **SUPER + SHIFT + E** | Power menu (SUPER + ESC still works too) | nothing |
+| **SUPER + L** | Lock the screen | SUPER + SHIFT + L |
+| **SUPER + M** | Hide or show the bar (CTRL + ESC still works too) | colour picker |
+| **SUPER + PRINT** | Screenshot of the whole screen, at once | nothing |
+| **SHIFT + PRINT** | Screenshot of the window you are in, at once | nothing |
+| mouse **back** button | Back to the workspace you were on before | nothing |
+| **SUPER + X** | Nothing (the power menu has Log out) | log out |
+
+And **SUPER + the number of the workspace you are on**, or a click on its name
+on the bar, takes you back to the workspace before, like i3's
+`workspace_auto_back_and_forth`.
+
+1. Add the line to `configuration.nix`. It works best with
+   [window groups](#window-groups-tabs) and [the i3 layout](#the-i3-layout-tabs-and-splits-like-i3)
+   on as well.
+2. Rebuild, then type `hyprctl reload` (or log out and back in).
+
+[Every shortcut in mysh264's setup](shortcuts-mysh264.md) lists every key
+with it on.
+
+**Want another key for one of its jobs?** Bind the key yourself in
+`~/.config/hypr/bindings/applications.lua`. Your line wins over this
+setting's, with no `hl.unbind` needed:
+[Keys that come from your NixOS settings](keys.md#keys-that-come-from-your-nixos-settings)
+shows how, with the jobs' names.
+
+### A drop-down terminal
+
+```nix
+  programs.hyprsimple.dropdownTerminal.enable = true;
+```
+
+Press **F12**, and a terminal slides down from the top of the screen, over
+your windows, with what is behind it blurred. Press **F12** again, and it
+slides away. What you typed in it stays there, for the next time. It is
+Ghostty's own drop-down terminal, so it has your theme and your font.
+
+> ⚠️ It needs Ghostty 1.4 or newer. nixos-unstable has it; NixOS 26.05 has
+> Ghostty 1.3, where the key does nothing yet (the rebuild warns you).
+
+1. Add the line to `configuration.nix`, and rebuild.
+2. Type `hyprctl reload` (or log out and back in).
+
+**Other keys?** List them, in the way Hyprland writes keys:
+
+```nix
+  programs.hyprsimple.dropdownTerminal.keys = [ "F12" "code:91" "mouse:276" ];
+```
+
+Here **F12**, the **.** on the number pad (`code:91`) and the mouse's
+**forward** button (`mouse:276`) all do it.
+[What is a key's name?](keys.md#what-is-a-keys-name) helps you find a key's
+name, and [Every button's name](keys.md#every-buttons-name) a mouse button's.
+
+**Its size,** and whether it slides away by itself when you click elsewhere,
+are Ghostty settings, in `~/.config/ghostty/config`:
+
+```
+quick-terminal-size = 50%
+quick-terminal-autohide = true
+```
+
+### Hot corners
+
+```nix
+  programs.hyprsimple.corners.enable = true;
+```
+
+Push the mouse pointer into a corner of the screen: the top left corner hides
+or shows the bar, the top right corner shows the desktop, and the bottom
+right corner goes back to the workspace before. You choose what each corner
+does: [Hot corners](corners.md) shows how, step by step.
+
 ### The bar at the bottom
 
 ```nix
@@ -361,6 +463,17 @@ the clock). This is your own setting, so updates keep it.
 
 Other plugins move the same way: write the plugin's name instead of
 `muslimtify`. `hyprsimple-plugin list` shows the names.
+
+**Or let your NixOS configuration choose the place,** so it is the same on
+every computer, also after a new install:
+
+```nix
+  programs.hyprsimple.muslimtify.placement = "right";
+```
+
+`"left"`, `"center"` or `"right"`, as above. Rebuild, then type
+`hyprsimple-update` in a terminal on your desktop: it moves the prayer time
+and restarts the bar. `hyprsimple-install` sets it the first time by itself.
 
 > 💡 Type the lines in a terminal on your desktop, not on a text screen or
 > over SSH. From there, the restarted bar cannot find your desktop.
@@ -524,6 +637,54 @@ To take it away, remove the line (or set it to `false`) and rebuild. On NixOS,
 hyprsimple's own `hyprsimple-session.sh` points here instead of changing
 anything.
 
+### The Conky panel
+
+```nix
+  programs.hyprsimple.conky.enable = true;
+```
+
+A clean panel on the desktop, on the right of the screen: the time, the
+weather, and how busy your computer is. It is the original Lean Conky Config,
+made to run on Wayland. It starts at every login, from your own copy in
+`~/.config/lean-conky-config`, which you can change as you like:
+[The Conky panel](conky.md) shows how.
+
+### Your own lines for Hyprland
+
+```nix
+  programs.hyprsimple.extraConfig = ''
+    hl.config({ general = { gaps_in = 5, gaps_out = 0, border_size = 3 } })
+  '';
+```
+
+Lines for Hyprland's configuration, written in Lua, the same language as the
+files in `~/.config/hypr`. The example puts 5 pixels between windows, none at
+the edge of the screen, and makes the border 3 pixels wide.
+
+Why here, and not in `~/.config/hypr`? Lines in your NixOS configuration come
+back by themselves on a new computer, or after a new install. A file in
+`~/.config/hypr` stays only on the computer where you wrote it.
+
+1. Put your lines between the two `''`.
+2. Rebuild, and type `hyprctl reload`.
+
+They run after hyprsimple-nix's own additions, and before your files in
+`~/.config/hypr`: a file there still wins. A key bound here takes the place of
+the same key from a setting on this page. Any line from
+[Keys, mouse buttons and the touchpad](keys.md) works here too. A mistake in
+a line shows as a red message when Hyprland starts, and the lines after it
+stop working: check with `hyprctl configerrors`.
+
+### A whole setup at once: mysh264's
+
+```nix
+      "${builtins.fetchTarball "https://github.com/mysh264/hyprsimple-nix/archive/main.tar.gz"}/profiles/mysh264.nix"
+```
+
+The maintainer's whole setup, every setting on this page chosen, in one file.
+That line goes in the `imports` list of `configuration.nix`:
+[mysh264's setup](mysh264.md) explains it step by step.
+
 ### Your graphics card
 
 Graphics settings live in their own file, `gpu.nix`. See the
@@ -612,6 +773,43 @@ same way as [`gpu.nix`](gpu.md#step-3-tell-nixos-to-read-the-file), and
 rebuild. It stops and prints the right `hash`; put it between the quotes and
 rebuild again. If one of hyprsimple-nix's NixOS fixes does not fit the newer
 version, the rebuild tells you which one.
+
+---
+
+## Packages of your own
+
+> ⚠️ For experienced people. The packages hyprsimple-nix picks are built for
+> your system and tested together.
+
+A few settings name the package a part comes from. You can give another
+build, for example one you patched yourself:
+
+| Setting | The package | It has to |
+|---|---|---|
+| `programs.hyprsimple.package` | hyprsimple itself (see above) | be hyprsimple, prepared for NixOS like the default |
+| `programs.hyprsimple.i3.package` | hy3, the plugin behind the i3 layout | be built for the Hyprland you run: a plugin built for another version does not load |
+| `programs.hyprsimple.qt.hyprqt6engine` | hyprqt6engine, which gives Qt programs hyprsimple's look | be built with the same Qt as your apps |
+| `programs.hyprsimple.muslimtify.package` | muslimtify, behind the prayer times | have hyprsimple-nix's NixOS fixes (its `pkgs/muslimtify`) |
+| `programs.hyprsimple.conky.package` | The Conky panel | have the `lean-conky-config` command |
+
+For example, hy3 from a commit of your choice:
+
+```nix
+{ options, pkgs, ... }:
+{
+  programs.hyprsimple.i3.package =
+    options.programs.hyprsimple.i3.package.default.overrideAttrs {
+      src = pkgs.fetchFromGitHub {
+        owner = "outfoxxed";
+        repo = "hy3";
+        rev = "PUT-THE-COMMIT-HERE";
+        hash = "";
+      };
+    };
+}
+```
+
+Save it as its own file, add it to `imports`, and rebuild, as above.
 
 ---
 

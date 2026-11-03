@@ -9,6 +9,7 @@
   git,
   gnugrep,
   gnused,
+  jq,
   util-linux,
   xdg-user-dirs,
   xdg-user-dirs-gtk,
@@ -136,6 +137,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
           git
           gnugrep
           gnused
+          jq
           util-linux
           xdg-user-dirs
           xdg-user-dirs-gtk

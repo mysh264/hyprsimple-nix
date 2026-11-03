@@ -21,6 +21,8 @@
       nixosModules = {
         hyprsimple = ./modules/nixos.nix;
         default = self.nixosModules.hyprsimple;
+        # The maintainer's whole setup, hyprsimple-nix included (docs/mysh264.md).
+        mysh264 = ./profiles/mysh264.nix;
       };
 
       # hyprsimple, hyprqt6engine and muslimtify, for use outside the module.
@@ -44,6 +46,7 @@
           inherit (p)
             hyprsimple
             hyprqt6engine
+            lean-conky-config
             muslimtify
             viewnior
             ;

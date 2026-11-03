@@ -72,27 +72,45 @@ let
 
   # A complete system with hyprsimple, instantiated but not built, so
   # evaluation errors in the module surface without downloading a desktop.
-  evalSystem = import "${pkgs.path}/nixos/lib/eval-config.nix" {
-    inherit (pkgs.stdenv.hostPlatform) system;
-    modules = [
-      self.nixosModules.default
-      {
-        programs.hyprsimple.enable = true;
-        boot.loader.grub.enable = false;
-        fileSystems."/" = {
-          device = "/dev/disk/by-label/nixos";
-          fsType = "ext4";
-        };
-        users.users.alice.isNormalUser = true;
-        system.stateVersion = "26.05";
-      }
-    ];
-  };
+  evalWith =
+    modules:
+    import "${pkgs.path}/nixos/lib/eval-config.nix" {
+      inherit (pkgs.stdenv.hostPlatform) system;
+      modules = modules ++ [
+        {
+          boot.loader.grub.enable = false;
+          fileSystems."/" = {
+            device = "/dev/disk/by-label/nixos";
+            fsType = "ext4";
+          };
+          users.users.alice.isNormalUser = true;
+          system.stateVersion = "26.05";
+        }
+      ];
+    };
+  evalSystem = evalWith [
+    self.nixosModules.default
+    { programs.hyprsimple.enable = true; }
+  ];
+  # mysh264's setup (profiles/mysh264.nix), which turns nearly everything on.
+  evalProfile = evalWith [ self.nixosModules.mysh264 ];
+  # Every setting at once, the corners on jobs and commands.
+  evalEverything = evalWith [
+    self.nixosModules.mysh264
+    {
+      programs.hyprsimple.corners.bottomLeft = "firefox --new-window";
+      programs.hyprsimple.loginEntry.enable = true;
+      programs.hyprsimple.extraConfig = ''
+        hl.bind("SUPER + K", hl.dsp.exec_cmd("true"), { description = "Mine" })
+      '';
+    }
+  ];
 in
 {
   inherit (p)
     hyprsimple
     hyprqt6engine
+    lean-conky-config
     muslimtify
     quickshell
     ;
@@ -159,6 +177,59 @@ in
   template-eval = pkgs.writeText "hyprsimple-template-eval" (
     builtins.unsafeDiscardStringContext evalTemplate.config.system.build.toplevel.drvPath
   );
+  profile-eval = pkgs.writeText "hyprsimple-profile-eval" (
+    builtins.unsafeDiscardStringContext evalProfile.config.system.build.toplevel.drvPath
+  );
+
+  # The Lua hyprsimple-nix writes to /etc/hyprsimple/hyprland.lua runs in
+  # the system's own Hyprland (`Hyprland --verify-config`), with no setting
+  # on, with mysh264's setup, and with everything on: loaded the way
+  # hyprsimple loads it, then lines as a user's files have them. Lua 5.5,
+  # Hyprland's, refuses some things Lua 5.4 allows, and some calls crash
+  # Hyprland outright while it only reads its configuration.
+  hyprland-config =
+    pkgs.runCommand "hyprsimple-hyprland-config"
+      {
+        nativeBuildInputs = [
+          pkgs.lua5_5
+          evalSystem.config.programs.hyprland.package
+        ];
+        hyprsimple = "${p.hyprsimple}/share/hyprsimple";
+        none = evalSystem.config.environment.etc."hyprsimple/hyprland.lua".text;
+        profile = evalProfile.config.environment.etc."hyprsimple/hyprland.lua".text;
+        everything = evalEverything.config.environment.etc."hyprsimple/hyprland.lua".text;
+        passAsFile = [
+          "none"
+          "profile"
+          "everything"
+        ];
+      }
+      ''
+        export HOME=$TMPDIR/home XDG_RUNTIME_DIR=$TMPDIR/run
+        mkdir -p $HOME $XDG_RUNTIME_DIR
+        for setup in none profile everything; do
+          file=$TMPDIR/$setup.lua
+          from=''${setup}Path
+          cp "''${!from}" "$file"
+          luac -p "$file" || { echo "the Lua for '$setup' does not compile"; exit 1; }
+          cat >$TMPDIR/$setup-entry.lua <<EOF
+        package.path = "$hyprsimple/?.lua;" .. package.path
+        dofile("$file")
+        hl.bind("SUPER + A", hl.dsp.exec_cmd("true"), { description = "App Launcher" })
+        hl.bind("SUPER + D", hl.dsp.exec_cmd("true"), { description = "Mine" })
+        EOF
+          Hyprland --verify-config -c $TMPDIR/$setup-entry.lua >$TMPDIR/$setup.out 2>&1 || true
+          if ! grep -q "config ok" $TMPDIR/$setup.out; then
+            echo "Hyprland does not take the Lua for '$setup':"
+            cat $TMPDIR/$setup.out
+            exit 1
+          fi
+        done
+        grep -q 'corner_jobs = { bottom_left = { command = "firefox --new-window" }' $TMPDIR/everything.lua
+        grep -q 'top_left = { job = "toggle_bar" }' $TMPDIR/everything.lua
+        grep -q 'programs.hyprsimple.extraConfig' $TMPDIR/everything.lua
+        touch $out
+      '';
 
   # `hyprsimple-nixos gpu --file` writes exactly the expected gpu.nix for
   # every machine in tests/gpu.

@@ -1,13 +1,59 @@
 -- hyprsimple-nix's additions to Hyprland's configuration: workspace names,
--- apps on their own workspace, window groups, the i3 layout and more keys,
--- each when programs.hyprsimple turns it on.
+-- apps on their own workspace, window groups, the i3 layout, more keys, a
+-- drop-down terminal, hot corners and the Conky panel, each when
+-- programs.hyprsimple turns it on.
 -- hyprsimple's own config loads this file (patch 0007), after its defaults
 -- and before your files in ~/.config/hypr, so your settings still win. The
 -- `nix` table above it holds the settings from your NixOS configuration.
 
-local function bind(keys, action, description)
-  hl.bind(keys, action, { description = description })
+local vars = require("default.hypr.vars")
+local home = os.getenv("HOME") or ""
+
+-- Keys as one spelling: small letters, no spaces, the held keys in order.
+-- "SUPER + CTRL + Left" and "CTRL+SUPER+LEFT" are the same key.
+local function normalize(keys)
+  if type(keys) ~= "string" then
+    return nil
+  end
+  local parts = {}
+  -- (A loop's own variable cannot change in Lua 5.5, Hyprland's Lua.)
+  for raw in keys:gmatch("[^+]+") do
+    local part = raw:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    if part ~= "" then
+      parts[#parts + 1] = part
+    end
+  end
+  if #parts == 0 then
+    return nil
+  end
+  local key = table.remove(parts)
+  table.sort(parts)
+  parts[#parts + 1] = key
+  return table.concat(parts, "+")
 end
+
+-- Every key bound here, by its keys. When your own files bind one of these
+-- keys again, yours takes its place (see "Your own keys win" at the end).
+local ours = {}
+
+local function bind(keys, action, description, options)
+  local opts = { description = description }
+  for name, value in pairs(options or {}) do
+    opts[name] = value
+  end
+  local kb = hl.bind(keys, action, opts)
+  local key = normalize(keys)
+  if key and kb then
+    ours[key] = ours[key] or {}
+    table.insert(ours[key], kb)
+  end
+  return kb
+end
+
+-- Lines of hyprsimple's first ~/.config/hypr/bindings/applications.lua whose
+-- keys a setting here gives another job: key -> that line's description. A
+-- line that still says exactly this is left out (see the end).
+local replaced = {}
 
 -- ---- Workspace names --------------------------------------------------------
 
@@ -123,6 +169,45 @@ jobs.next_below = either(nil, hy3 and hy3.make_group("v"))
 jobs.turn_split = either(nil, hy3 and hy3.change_group("opposite"))
 jobs.first_workspace = edge(false)
 jobs.last_workspace = edge(true)
+
+-- Jobs for the hot corners, the drop-down terminal and the i3-style keys.
+local function run(command)
+  return function()
+    hl.exec_cmd(command)
+  end
+end
+-- An empty workspace, which shows the desktop: the wallpaper, and the panel
+-- of Conky. The bar shows it as 97 while you are there.
+local desktop = 97
+jobs.terminal = run(vars.terminal)
+jobs.launcher = run(vars.menu)
+jobs.notifications = run(vars.barPanel .. "notifications")
+jobs.power_menu = run(vars.powermenu)
+jobs.lock = run("hyprlock")
+jobs.toggle_bar = run(home .. "/.local/bin/hyprsimple-restart-bar.sh --toggle")
+jobs.scratchpad = function()
+  hl.dispatch(hl.dsp.workspace.toggle_special("magic"))
+end
+jobs.workspace_before = function()
+  hl.dispatch(hl.dsp.focus({ workspace = "previous" }))
+end
+jobs.show_desktop = function()
+  local here = hl.get_active_workspace()
+  if here and here.id == desktop then
+    hl.dispatch(hl.dsp.focus({ workspace = "previous" }))
+  else
+    hl.dispatch(hl.dsp.focus({ workspace = tostring(desktop) }))
+  end
+end
+-- Ghostty's own drop-down terminal, which a running Ghostty brings down when
+-- asked. With no Ghostty running yet, its background service starts first:
+-- otherwise the very first press opens an ordinary window instead. (With a
+-- Ghostty window open, that one answers, and the service would fail.)
+jobs.dropdown_terminal = run(
+  "sh -c 'busctl --user --quiet status com.mitchellh.ghostty >/dev/null 2>&1"
+    .. " || systemctl --user start app-com.mitchellh.ghostty.service;"
+    .. " ghostty +toggle-quick-terminal'"
+)
 
 -- ---- Groups and tabs --------------------------------------------------------
 
@@ -376,5 +461,258 @@ if nix.numpad then
   for number = 0, 9 do
     local workspace = tostring(number == 0 and 10 or number)
     bind("SHIFT + " .. key(number), hl.dsp.focus({ workspace = workspace }), "Workspace " .. workspace)
+  end
+end
+
+-- ---- The drop-down terminal -------------------------------------------------
+
+if nix.dropdown then
+  -- It slides down from the top of the screen, with what is behind it blurred.
+  hl.layer_rule({
+    match = { namespace = "ghostty-quick-terminal" },
+    blur = true,
+    ignore_alpha = 0.1,
+    animation = "slide top",
+  })
+  for _, keys in ipairs(nix.dropdown_keys) do
+    bind(keys, jobs.dropdown_terminal, "Drop-down Terminal")
+  end
+end
+
+-- ---- Hot corners ------------------------------------------------------------
+
+-- The pointer in a corner of the screen does that corner's job, once: it has
+-- to move away before the corner works again, so resting there does nothing
+-- more. Corners rest while a window is full screen (a film, a game). Your own
+-- files can give a corner another job (docs/corners.md):
+--
+--   hyprsimple_nix.corners.bottom_left = function() hl.exec_cmd("firefox") end
+hyprsimple_nix.corners = {}
+if nix.corners then
+  local corners = hyprsimple_nix.corners
+  for name, job in pairs(nix.corner_jobs) do
+    if job.job then
+      corners[name] = jobs[job.job]
+    else
+      corners[name] = run(job.command)
+    end
+  end
+
+  -- How close the pointer has to come, and how far it has to go again.
+  local near = nix.corner_size
+  local away = math.max(48, near * 6)
+  local armed = { top_left = true, top_right = true, bottom_left = true, bottom_right = true }
+
+  -- The pointer's distance from a corner of the screen it is on. Hyprland
+  -- gives a screen's size in pixels, and the pointer's place in scaled units.
+  local function distance(pos, monitor, corner)
+    local scale = monitor.scale or 1
+    local width, height = monitor.width / scale, monitor.height / scale
+    if (monitor.transform or 0) % 2 == 1 then
+      width, height = height, width
+    end
+    local x = corner:find("left", 1, true) and monitor.x or (monitor.x + width - 1)
+    local y = corner:find("top", 1, true) and monitor.y or (monitor.y + height - 1)
+    return math.max(math.abs(pos.x - x), math.abs(pos.y - y))
+  end
+
+  local function full_screen()
+    local workspace = hl.get_active_workspace()
+    return workspace ~= nil and workspace.has_fullscreen
+  end
+
+  local function look()
+    local pos = hl.get_cursor_pos()
+    local monitor = hl.get_monitor_at_cursor()
+    if not pos or not monitor then
+      return
+    end
+    for corner in pairs(armed) do
+      local d = distance(pos, monitor, corner)
+      if d <= near then
+        if armed[corner] then
+          armed[corner] = false
+          -- Looked up each time: your files may have given it another job.
+          local job = (hyprsimple_nix.corners or {})[corner]
+          if job and not full_screen() then
+            job()
+          end
+        end
+      elseif d >= away then
+        armed[corner] = true
+      end
+    end
+  end
+
+  -- The timer starts once Hyprland runs: right away on a reload, at the
+  -- start otherwise. A timer made while only the configuration is read
+  -- (`Hyprland --verify-config`) makes Hyprland crash.
+  local function start()
+    hl.timer(look, { timeout = 50, type = "repeat" })
+  end
+  local monitors = hl.get_monitors()
+  if monitors and #monitors > 0 then
+    start()
+  else
+    hl.on("hyprland.start", start)
+  end
+end
+
+-- ---- Keys in i3's style -----------------------------------------------------
+
+-- programs.hyprsimple.keys.i3Style: the keys of an i3 user, the maintainer of
+-- hyprsimple-nix. docs/shortcuts-mysh264.md lists every key with them. Each
+-- key they move is taken from its old job first, so no key does two things.
+if nix.i3_style then
+  for _, keys in ipairs({
+    "SUPER + A", "SUPER + M", "SUPER + W", "SUPER + D", "SUPER + S", "SUPER + X",
+    "SUPER + H", "SUPER + J", "SUPER + K", "SUPER + L",
+    "SUPER + SHIFT + RIGHT", "SUPER + SHIFT + LEFT", "SUPER + SHIFT + UP", "SUPER + SHIFT + DOWN",
+    "SUPER + CTRL + LEFT", "SUPER + CTRL + RIGHT", "SUPER + CTRL + UP", "SUPER + CTRL + DOWN",
+    "SUPER + SHIFT + S", "SUPER + SHIFT + L", "SUPER + SHIFT + D",
+    "SUPER + ALT + G", "SUPER + ALT + LEFT", "SUPER + ALT + RIGHT", "SUPER + ALT + UP", "SUPER + ALT + DOWN",
+    "SUPER + ALT + H", "SUPER + ALT + L", "SUPER + ALT + K", "SUPER + ALT + J",
+    "SUPER + ALT + TAB", "SUPER + ALT + SHIFT + TAB",
+    "SUPER + CTRL + SPACE", "SUPER + CTRL + H", "SUPER + CTRL + J", "SUPER + CTRL + E",
+  }) do
+    hl.unbind(keys)
+  end
+  -- hyprsimple's first applications.lua binds these two keys, which get
+  -- other jobs here: the app launcher moves to SUPER + D, the colour picker
+  -- to SUPER + P.
+  replaced[normalize("SUPER + A")] = "App Launcher"
+  replaced[normalize("SUPER + M")] = "Color Picker"
+
+  -- Apps. (SUPER + T still opens the terminal too.)
+  bind("SUPER + Return", hl.dsp.exec_cmd(vars.terminal), "Terminal")
+  bind("SUPER + D", hl.dsp.exec_cmd(vars.menu), "App Launcher")
+  bind("SUPER + P", hl.dsp.exec_cmd("sh -c '" .. vars.colorPicker .. " | wl-copy'"), "Color Picker")
+
+  -- Windows.
+  bind("SUPER + Z", hl.dsp.window.float({ action = "toggle" }), "Toggle Floating")
+  bind("SUPER + SHIFT + F", hl.dsp.window.fullscreen(), "Fullscreen")
+  bind("SUPER + Left", jobs.focus_left, "Focus Left")
+  bind("SUPER + Right", jobs.focus_right, "Focus Right")
+  bind("SUPER + Up", jobs.focus_up, "Focus Up")
+  bind("SUPER + Down", jobs.focus_down, "Focus Down")
+  for _, way in ipairs({ { "Right", 30, 0 }, { "Left", -30, 0 }, { "Up", 0, -30 }, { "Down", 0, 30 } }) do
+    bind(
+      "SUPER + CTRL + " .. way[1],
+      hl.dsp.window.resize({ x = way[2], y = way[3], relative = true }),
+      "Resize " .. way[1],
+      { repeating = true }
+    )
+  end
+
+  -- Workspaces. SUPER + TAB goes round: after the last workspace, the first.
+  bind("SUPER + Tab", hl.dsp.focus({ workspace = "e+1" }), "Next Workspace")
+  bind("SUPER + SHIFT + Tab", hl.dsp.focus({ workspace = "e-1" }), "Previous Workspace")
+  bind("SUPER + S", jobs.scratchpad, "Show / Hide the Scratchpad")
+  bind("SUPER + SHIFT + S", function()
+    local window = hl.get_active_window()
+    if not window then
+      return
+    end
+    if window.workspace and window.workspace.special then
+      local here = hl.get_active_workspace()
+      if here then
+        hl.dispatch(hl.dsp.window.move({ workspace = tostring(here.id) }))
+      end
+    else
+      hl.dispatch(hl.dsp.window.move({ workspace = "special:magic", follow = false }))
+    end
+  end, "Window into / out of the Scratchpad")
+  for _, way in ipairs({ { "Left", "l" }, { "Right", "r" }, { "Up", "u" }, { "Down", "d" } }) do
+    bind(
+      "SUPER + ALT + " .. way[1],
+      hl.dsp.workspace.move({ monitor = way[2] }),
+      "Move Workspace to " .. way[1] .. " Monitor"
+    )
+  end
+  -- SUPER + the workspace you are on, or a click on it on the bar, goes back
+  -- to the one before, like i3's workspace_auto_back_and_forth.
+  hl.config({ binds = { workspace_back_and_forth = true } })
+
+  -- Window groups and the i3 layout.
+  bind("SUPER + SHIFT + G", jobs.leave_group, "Take Window out of Group")
+  for _, way in ipairs({ { "Left", "left" }, { "Right", "right" }, { "Up", "up" }, { "Down", "down" } }) do
+    bind(
+      "SUPER + SHIFT + " .. way[1],
+      jobs["into_group_" .. way[2]],
+      describe("Move Window into Group " .. way[1], "Move Window " .. way[1])
+    )
+  end
+  bind("SUPER + A", jobs.switch_layout, "Switch This Workspace: Hyprland / i3 Layout")
+  bind("SUPER + H", jobs.next_beside, "i3 Layout: Next Window Beside")
+  bind("SUPER + J", jobs.next_below, "i3 Layout: Next Window Below")
+  bind("SUPER + E", jobs.turn_split, "i3 Layout: Turn the Split")
+
+  -- Panels on the bar, and the system.
+  local shots = home .. "/Pictures/Screenshots"
+  bind("SUPER + SHIFT + A", hl.dsp.exec_cmd(vars.barPanel .. "volume"), "Sound (panel: volume and output device)")
+  bind("SUPER + ALT + D", hl.dsp.exec_cmd(vars.barPanel .. "notifications"), "Notifications (panel)")
+  bind("SUPER + SHIFT + D", hl.dsp.exec_cmd(home .. "/.local/bin/notification-dismiss.sh"), "Dismiss Notifications")
+  bind("SUPER + SHIFT + E", hl.dsp.exec_cmd(vars.powermenu), "Power Menu")
+  bind("SUPER + L", hl.dsp.exec_cmd("hyprlock"), "Lock Screen")
+  bind("SUPER + M", hl.dsp.exec_cmd(home .. "/.local/bin/hyprsimple-restart-bar.sh --toggle"), "Toggle Bar")
+  bind(
+    "SUPER + Print",
+    hl.dsp.exec_cmd("hyprshot -m output -m active --output-folder " .. shots),
+    "Screenshot of the Whole Screen"
+  )
+  bind(
+    "SHIFT + Print",
+    hl.dsp.exec_cmd("hyprshot -m window -m active --output-folder " .. shots),
+    "Screenshot of the Window"
+  )
+
+  -- The mouse's back button: back to the workspace before.
+  bind("mouse:275", hl.dsp.focus({ workspace = "previous" }), "Back to the Workspace Before")
+end
+
+-- ---- The Conky panel --------------------------------------------------------
+
+-- Lean Conky Config, from github.com/mysh264/lean-conky-config-wayland, run
+-- from your own copy in ~/.config/lean-conky-config (docs/conky.md).
+if nix.conky then
+  hl.on("hyprland.start", function()
+    hl.exec_cmd("uwsm app -- lean-conky-config -n")
+  end)
+end
+
+-- ---- Your own keys win ------------------------------------------------------
+
+-- Your files in ~/.config/hypr load after this one. When one of them binds a
+-- key that a setting above bound too, the setting's job on that key steps
+-- aside, and the key does yours alone: no hl.unbind needed. (A key of
+-- hyprsimple's own defaults still needs it; see docs/keys.md.)
+-- One exception: the lines of hyprsimple's first applications.lua whose keys
+-- a setting gave other jobs. Such a line comes first in that file, so the
+-- first bind of its key that still has hyprsimple's description is left out.
+-- A line of yours for that key, further down, wins as usual.
+do
+  local bind_now = hl.bind
+  local left_out = {
+    set_enabled = function() end,
+    is_enabled = function()
+      return false
+    end,
+    remove = function() end,
+    unbind = function() end,
+  }
+  hl.bind = function(keys, action, opts, ...)
+    local key = normalize(keys)
+    if key and ours[key] then
+      local description = type(opts) == "table" and (opts.description or opts.desc) or nil
+      if replaced[key] ~= nil and replaced[key] == description then
+        replaced[key] = nil
+        return left_out
+      end
+      for _, kb in ipairs(ours[key]) do
+        pcall(kb.remove, kb)
+      end
+      ours[key] = nil
+    end
+    return bind_now(keys, action, opts, ...)
   end
 end

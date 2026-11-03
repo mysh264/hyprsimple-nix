@@ -73,10 +73,12 @@ Add 'programs.hyprsimple.enable = true;' to it and rebuild."
 
 system_source() { readlink -f -- "$ETC/source"; }
 
-# Written by the module: HYPRSIMPLE_NIX_DEFAULT_THEME, HYPRSIMPLE_NIX_MUSLIMTIFY.
+# Written by the module: HYPRSIMPLE_NIX_DEFAULT_THEME, HYPRSIMPLE_NIX_MUSLIMTIFY,
+# HYPRSIMPLE_NIX_MUSLIMTIFY_PLACEMENT.
 load_settings() {
   HYPRSIMPLE_NIX_DEFAULT_THEME="deep-sea"
   HYPRSIMPLE_NIX_MUSLIMTIFY=0
+  HYPRSIMPLE_NIX_MUSLIMTIFY_PLACEMENT=""
   # shellcheck source=/dev/null
   [[ -r $ETC/settings ]] && source "$ETC/settings"
 }
@@ -165,6 +167,7 @@ deliver() {
 
 cmd_sync() {
   require_module
+  load_settings
   [[ -d $HYPRSIMPLE_PATH ]] || die "hyprsimple is not set up for $(id -un) yet. Run hyprsimple-install."
   # First, so that it happens even when the delivery below stops.
   repair_user_units
@@ -178,6 +181,31 @@ cmd_sync() {
     good "hyprsimple $after is already what your NixOS configuration provides."
     echo "For a newer one, update the hyprsimple-nix flake input, rebuild, and run hyprsimple-update again."
   fi
+  if place_muslimtify && [[ -n ${HYPRSIMPLE_NIX_PLACED:-} ]]; then
+    # Only from inside the desktop: a bar restarted from SSH or a text
+    # console cannot find the screen.
+    if [[ -n ${WAYLAND_DISPLAY:-} && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} && -x $HOME/.local/bin/hyprsimple-restart-bar.sh ]]; then
+      "$HOME/.local/bin/hyprsimple-restart-bar.sh" >/dev/null 2>&1 || true
+    else
+      echo "The bar shows it there from your next login."
+    fi
+  fi
+}
+
+# Puts the prayer time where programs.hyprsimple.muslimtify.placement says,
+# in ~/.config/hyprsimple/plugins.json, once the plugin is there. Sets
+# HYPRSIMPLE_NIX_PLACED when it moved it.
+place_muslimtify() {
+  HYPRSIMPLE_NIX_PLACED=""
+  local placement=${HYPRSIMPLE_NIX_MUSLIMTIFY_PLACEMENT:-}
+  local file=$HOME/.config/hyprsimple/plugins.json
+  [[ -n $placement && -f $file ]] || return 0
+  jq -e '.plugins.muslimtify' "$file" >/dev/null 2>&1 || return 0
+  [[ $(jq -r '.plugins.muslimtify.placement // ""' "$file") == "$placement" ]] && return 0
+  jq --arg placement "$placement" '.plugins.muslimtify.placement = $placement' "$file" >"$file.new" &&
+    mv -- "$file.new" "$file"
+  good "The prayer time is now on the $placement of the bar, as your NixOS configuration says."
+  HYPRSIMPLE_NIX_PLACED=1
 }
 
 # ---- Packages --------------------------------------------------------------
@@ -457,6 +485,7 @@ install_plugins() {
   note "Installing the muslimtify plugin (prayer times on the bar)..."
   if "$manager" "${action[@]}"; then
     good "muslimtify plugin enabled"
+    place_muslimtify
   else
     FAILED+=("muslimtify plugin: retry with  hyprsimple-plugin ${action[*]}")
   fi
