@@ -102,6 +102,8 @@ pkgs.testers.runNixOSTest {
           print(user("journalctl --user -b --no-pager -o short-monotonic | tail -n 200", check=False)[1])
           print(user("hyprctl instances 2>&1; hyprctl monitors 2>&1; hyprctl configerrors 2>&1", check=False)[1])
           print(user("tail -n 150 /run/user/1000/hypr/*/hyprland.log 2>&1", check=False)[1])
+          # Hyprland writes a report of its own when it crashes.
+          print(user("for r in ~/.cache/hyprland/hyprlandCrashReport*.txt; do [ -e \"$r\" ] && echo \"== $r\" && head -n 120 \"$r\"; done", check=False)[1])
 
       machine.wait_for_unit("multi-user.target")
       # The automatic login may not have begun yet, and then wait_for_unit
@@ -1011,10 +1013,14 @@ pkgs.testers.runNixOSTest {
           user("test -f ~/.local/state/hyprsimple/migrations/9999999999.sh")
           user("test \"$(git -C ~/.local/share/hyprsimple rev-list --count HEAD)\" = 2")
           user("test \"$(cat ~/.local/share/hyprsimple/version)\" = 9.9.9")
-          machine.wait_until_succeeds(
-              "pgrep -u alice -f 'qs -p /home/alice/.local/share/hyprsimple/default/quickshell'",
-              timeout=60,
-          )
+          try:
+              machine.wait_until_succeeds(
+                  "pgrep -u alice -f 'qs -p /home/alice/.local/share/hyprsimple/default/quickshell'",
+                  timeout=60,
+              )
+          except Exception:
+              dump_session()
+              raise
 
       with subtest("the Hyprsimple login entry starts the same desktop"):
           # Retried: when a timer (battery-monitor) queues a start at that very
