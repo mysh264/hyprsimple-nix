@@ -666,7 +666,14 @@ pkgs.testers.runNixOSTest {
                       eventually(lambda: photo in title(app), f"{keys} in {app} did not show {photo}: {title(app)}")
               before = photo_area()
               machine.send_key("ctrl-r")
-              eventually(lambda: photo_area() != before, f"ctrl-r did not turn the photo in {app}")
+              # Pressed once more if it changed nothing in 10 seconds, as the
+              # keys above (on GitHub's runners imv let a ctrl-r go by too).
+              try:
+                  eventually(lambda: photo_area() != before, "", timeout=10)
+              except AssertionError:
+                  print(f"ctrl-r in {app}: nothing after 10 seconds, pressing it again")
+                  machine.send_key("ctrl-r")
+                  eventually(lambda: photo_area() != before, f"ctrl-r did not turn the photo in {app}")
               machine.send_key("esc")
               eventually(lambda: title(app) == "", f"esc did not close {app}")
           press("meta_l-1", 1)
@@ -743,7 +750,15 @@ pkgs.testers.runNixOSTest {
 
           here = active()
           pad("fingers 3 -400 0")
-          eventually(lambda: active() != here, "a 3-finger swipe did not change the workspace")
+          # Right after the reload, which sets the touchpad up again, a swipe
+          # can go by on GitHub's runners: it is swiped once more then. A swipe
+          # that is not set up still fails.
+          try:
+              eventually(lambda: active() != here, "", timeout=10)
+          except AssertionError:
+              print("the swipe changed nothing in 10 seconds, swiping again")
+              pad("fingers 3 -400 0")
+              eventually(lambda: active() != here, "a 3-finger swipe did not change the workspace")
           pad("fingers 3 400 0")
           eventually(lambda: active() == here, "a 3-finger swipe back did not come back")
 
