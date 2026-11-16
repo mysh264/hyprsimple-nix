@@ -22,13 +22,13 @@
 # files, the way hyprsimple expects them.
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "hyprsimple";
-  version = "0.4.9";
+  version = "0.4.11";
 
   src = fetchFromGitHub {
     owner = "rizukirr";
     repo = "hyprsimple";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-6PnzAX8rAlSJOSy6EJa7a4enGe3OV4Um0QgslO5uPIw=";
+    hash = "sha256-w4aC3YBxWqZXP1ghzTL2oVA9Rc7tkZxFRsl6Mr7xONA=";
   };
 
   # Patches 1 to 4, 6 and 7 only add a branch taken when /etc/hyprsimple
